@@ -1,7 +1,6 @@
-import {createReadStream} from 'node:fs';
-import {stat} from 'node:fs/promises';
 import {
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
   type S3ClientConfig,
@@ -41,34 +40,81 @@ const getClient = (): S3Client => {
 
 export const getS3Bucket = (): string => required('S3_BUCKET');
 
-export const uploadVideo = async ({
-  filePath,
-  key,
-}: {
-  filePath: string;
-  key: string;
-}) => {
-  const client = getClient();
-  const bucket = getS3Bucket();
-  const info = await stat(filePath);
+const signedLifetime = (): number =>
+  Math.min(
+    Number(process.env.S3_RENDER_URL_EXPIRES_SECONDS ?? 86400),
+    604800,
+  );
 
-  await client.send(
+export const putObject = async ({
+  key,
+  body,
+  contentType,
+}: {
+  key: string;
+  body: string | Uint8Array;
+  contentType: string;
+}): Promise<void> => {
+  await getClient().send(
     new PutObjectCommand({
-      Bucket: bucket,
+      Bucket: getS3Bucket(),
       Key: key,
-      Body: createReadStream(filePath),
-      ContentLength: info.size,
-      ContentType: 'video/mp4',
+      Body: body,
+      ContentType: contentType,
+      CacheControl: 'no-store',
+    }),
+  );
+};
+
+export const getTextObject = async (key: string): Promise<string> => {
+  const response = await getClient().send(
+    new GetObjectCommand({
+      Bucket: getS3Bucket(),
+      Key: key,
     }),
   );
 
-  return {
-    bucket,
-    key,
-    contentType: 'video/mp4',
-    sizeInBytes: info.size,
-  };
+  if (!response.Body) {
+    throw new Error(`S3 object has no body: ${key}`);
+  }
+
+  return response.Body.transformToString();
 };
+
+export const getObjectUrl = async (key: string): Promise<string> =>
+  getSignedUrl(
+    getClient(),
+    new GetObjectCommand({
+      Bucket: getS3Bucket(),
+      Key: key,
+    }),
+    {expiresIn: signedLifetime()},
+  );
+
+export const createPutUrl = async ({
+  key,
+  contentType,
+}: {
+  key: string;
+  contentType: string;
+}): Promise<string> =>
+  getSignedUrl(
+    getClient(),
+    new PutObjectCommand({
+      Bucket: getS3Bucket(),
+      Key: key,
+      ContentType: contentType,
+    }),
+    {expiresIn: signedLifetime()},
+  );
+
+export const headObject = async (key: string) =>
+  getClient().send(
+    new HeadObjectCommand({
+      Bucket: getS3Bucket(),
+      Key: key,
+    }),
+  );
 
 export const getVideoUrl = async ({
   bucket,
@@ -82,17 +128,5 @@ export const getVideoUrl = async ({
     return `${publicBaseUrl}/${key.split('/').map(encodeURIComponent).join('/')}`;
   }
 
-  const expiresIn = Math.min(
-    Number(process.env.S3_SIGNED_URL_EXPIRES_SECONDS ?? 3600),
-    604800,
-  );
-
-  return getSignedUrl(
-    getClient(),
-    new GetObjectCommand({
-      Bucket: bucket,
-      Key: key,
-    }),
-    {expiresIn},
-  );
+  return getObjectUrl(key);
 };

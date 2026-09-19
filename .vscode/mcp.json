@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "remotion": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/user/repos/remotion-mcp/dist/index.js"
+      ]
+    }
+  },
+  "inputs": []
+}

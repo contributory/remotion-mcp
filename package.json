@@ -1,7 +1,7 @@
 {
   "name": "remotion-mcp",
-  "version": "1.1.0",
-  "description": "MCP server for asynchronous AI-authored Remotion video rendering with S3 and Trigger.dev",
+  "version": "1.2.0",
+  "description": "MCP server for browser-rendered AI-authored Remotion videos with S3 and Trigger.dev",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -20,14 +20,15 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@remotion/bundler": "^4.0.526",
     "@remotion/renderer": "^4.0.526",
+    "@remotion/web-renderer": "^4.0.526",
     "@trigger.dev/sdk": "^4.6.3",
+    "esbuild": "^0.28.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "remotion": "^4.0.526",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@trigger.dev/build": "^4.6.3",
     "@types/node": "^26.6.2",
     "trigger.dev": "^4.6.3",
     "typescript": "^7.0.2"

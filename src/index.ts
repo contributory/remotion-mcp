@@ -10,7 +10,7 @@ import {listCompositions, renderFrame, renderVideo} from './remotion.js';
 
 const server = new McpServer({
   name: 'remotion-mcp',
-  version: '1.1.0',
+  version: '1.2.0',
 });
 
 const inputPropsSchema = z
@@ -41,7 +41,7 @@ server.registerTool(
   'create_video_from_react',
   {
     description:
-      'Start an asynchronous Remotion render from React code. The React code must default-export a component. Returns a task ID immediately; use check_render_task to poll it.',
+      'Create a browser-rendered Remotion video task from React code. Returns a task ID and a render URL that the user must open in a browser. The browser performs the render and uploads the MP4 directly to S3.',
     inputSchema: {
       reactCode: z
         .string()
@@ -103,7 +103,7 @@ server.registerTool(
   'check_render_task',
   {
     description:
-      'Check an asynchronous video render task. When complete, returns a fresh URL for viewing the rendered video stored in S3.',
+      'Check a browser render task. While pending, returns a fresh render URL. When complete, returns a fresh URL for viewing the MP4 stored in S3.',
     inputSchema: {
       taskId: z.string().min(1),
     },
@@ -218,6 +218,7 @@ server.registerTool(
     }
   },
 );
+
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
