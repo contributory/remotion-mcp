@@ -4,3 +4,5 @@ dist/
 .remotion-mcp-tasks/
 *.log
 .DS_Store
+
+.secrets
