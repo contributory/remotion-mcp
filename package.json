@@ -1,0 +1,29 @@
+{
+  "name": "remotion-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for inspecting and rendering Remotion projects",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "node --enable-source-maps dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@remotion/bundler": "^4.0.526",
+    "@remotion/renderer": "^4.0.526",
+    "remotion": "^4.0.526",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  },
+  "type": "module",
+  "bin": {
+    "remotion-mcp": "dist/index.js"
+  }
+}
