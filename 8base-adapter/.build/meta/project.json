@@ -1,0 +1,10 @@
+{
+  "name": "8base-adapter",
+  "functions": [
+    {
+      "name": "remotionMcp",
+      "handler": "remotionMcp.handler",
+      "pathToFunction": "src/mcpWebhook.js"
+    }
+  ]
+}

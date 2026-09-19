@@ -1,0 +1,18 @@
+{
+  "functions": [
+    {
+      "name": "remotionMcp",
+      "handler": "remotionMcp.handler"
+    }
+  ],
+  "resolvers": [],
+  "triggers": [],
+  "webhooks": [
+    {
+      "name": "remotionMcp",
+      "functionName": "remotionMcp",
+      "httpMethod": "POST",
+      "path": "mcp"
+    }
+  ]
+}

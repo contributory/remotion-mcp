@@ -4,14 +4,14 @@ import {fileURLToPath} from 'node:url';
 import {build} from 'esbuild';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const outdir = resolve(root, 'dist');
+const outdir = resolve(root, 'src');
 
-await rm(outdir, {recursive: true, force: true});
 await mkdir(outdir, {recursive: true});
+await rm(resolve(outdir, 'runtime.js'), {force: true});
 
 await build({
   entryPoints: [resolve(root, 'adapter-src/runtime.ts')],
-  outfile: resolve(outdir, 'runtime.cjs'),
+  outfile: resolve(outdir, 'runtime.js'),
   bundle: true,
   platform: 'node',
   format: 'cjs',
@@ -45,4 +45,4 @@ await build({
   ],
 });
 
-console.log('Built 8base adapter:', resolve(outdir, 'runtime.cjs'));
+console.log('Built 8base adapter:', resolve(outdir, 'runtime.js'));

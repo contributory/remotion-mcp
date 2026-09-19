@@ -110,7 +110,7 @@ npm run build
 The build creates:
 
 ```text
-dist/runtime.cjs
+src/runtime.js
 ```
 
 It bundles the compatibility code plus the selected existing `../src/` modules while leaving npm dependencies external. This avoids copying the main server-side renderer/bundler stack into the 8base package.
