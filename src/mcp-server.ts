@@ -51,14 +51,14 @@ const asError = (error: unknown) => ({
 export const createMcpServer = () => {
   const server = new McpServer({
     name: 'remotion-mcp',
-    version: '1.4.0',
+    version: '1.5.0',
   });
 
   server.registerTool(
     'create_composition',
     {
       description:
-        'Persist a reusable React/Remotion composition. Stateful environments store it on local disk; stateless environments store it in S3.',
+        'Persist a reusable React/Remotion composition. Storage is local by default on stateful hosts, switches to S3 when S3_BUCKET is configured, and is always S3 in stateless mode.',
       inputSchema: {
         compositionId: compositionIdSchema.describe(
           'Stable ID used to list and render this composition later',

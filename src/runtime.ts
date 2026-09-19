@@ -15,6 +15,9 @@ export const isStatelessEnvironment = (): boolean =>
 export const executionBackend = (): 'local' | 'trigger' =>
   isStatelessEnvironment() ? 'trigger' : 'local';
 
+export const storageBackend = (): 'local' | 's3' =>
+  isStatelessEnvironment() || Boolean(process.env.S3_BUCKET) ? 's3' : 'local';
+
 export const transportMode = (): 'stdio' | 'http' => {
   if (isStatelessEnvironment()) return 'http';
 

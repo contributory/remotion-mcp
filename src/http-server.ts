@@ -16,6 +16,7 @@ import {
   httpHost,
   httpPort,
   isStatelessEnvironment,
+  storageBackend,
 } from './runtime.js';
 import type {
   BrowserRenderState,
@@ -246,7 +247,7 @@ export const startHttpService = async ({
   });
 
   if (enableMcp) registerMcpRoutes(app);
-  if (!isStatelessEnvironment()) registerLocalRenderRoutes(app);
+  if (storageBackend() === 'local') registerLocalRenderRoutes(app);
 
   await new Promise<void>((resolve, reject) => {
     const listener = app.listen(httpPort(), host, () => {

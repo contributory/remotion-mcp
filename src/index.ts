@@ -4,6 +4,7 @@ import {createMcpServer} from './mcp-server.js';
 import {startHttpService} from './http-server.js';
 import {
   isStatelessEnvironment,
+  storageBackend,
   transportMode,
 } from './runtime.js';
 
@@ -17,13 +18,17 @@ if (mode === 'http') {
     } environment)`,
   );
 } else {
-  await startHttpService({enableMcp: false});
+  if (storageBackend() === 'local') {
+    await startHttpService({enableMcp: false});
+  }
 
   const server = createMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
   console.error(
-    '[remotion-mcp] MCP running over stdio; local browser-render HTTP service is enabled',
+    storageBackend() === 'local'
+      ? '[remotion-mcp] MCP running over stdio; local browser-render HTTP service is enabled'
+      : '[remotion-mcp] MCP running over stdio; storage backend is S3',
   );
 }

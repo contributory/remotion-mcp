@@ -28,6 +28,7 @@ import {
 import {
   executionBackend,
   publicBaseUrl,
+  storageBackend,
 } from './runtime.js';
 import type {
   BrowserRenderJob,
@@ -80,13 +81,16 @@ const startLocalTask = async (request: GeneratedVideoRequest) => {
   return {
     taskId,
     backend: 'local' as const,
+    storage: 'local' as const,
     renderUrl: urls.renderUrl,
     status: 'waiting_for_browser' as const,
   };
 };
 
-const startStatelessTask = async (request: GeneratedVideoRequest) => {
-  if (!process.env.TRIGGER_SECRET_KEY) {
+const startS3Task = async (request: GeneratedVideoRequest) => {
+  const backend = executionBackend();
+
+  if (backend === 'trigger' && !process.env.TRIGGER_SECRET_KEY) {
     throw new Error('TRIGGER_SECRET_KEY is required in stateless mode.');
   }
 
@@ -121,7 +125,7 @@ const startStatelessTask = async (request: GeneratedVideoRequest) => {
 
   const job: BrowserRenderJob = {
     id: taskId,
-    backend: 'trigger',
+    backend,
     createdAt,
     compositionId: request.compositionId,
     durationInFrames: request.durationInFrames,
@@ -148,18 +152,21 @@ const startStatelessTask = async (request: GeneratedVideoRequest) => {
     }),
   ]);
 
-  const handle = await tasks.trigger('remotion-browser-render-job', {
-    taskId,
-    statusKey: jobStatusKey,
-    outputKey: jobOutputKey,
-  });
+  if (backend === 'trigger') {
+    const handle = await tasks.trigger('remotion-browser-render-job', {
+      taskId,
+      statusKey: jobStatusKey,
+      outputKey: jobOutputKey,
+    });
 
-  job.triggerRunId = handle.id;
-  await saveJob(job);
+    job.triggerRunId = handle.id;
+    await saveJob(job);
+  }
 
   return {
     taskId,
-    backend: 'trigger' as const,
+    backend,
+    storage: 's3' as const,
     renderUrl: await getObjectUrl(jobRenderKey),
     status: 'waiting_for_browser' as const,
   };
@@ -168,9 +175,9 @@ const startStatelessTask = async (request: GeneratedVideoRequest) => {
 export const startGeneratedVideoTask = async (
   request: GeneratedVideoRequest,
 ) =>
-  executionBackend() === 'local'
+  storageBackend() === 'local'
     ? startLocalTask(request)
-    : startStatelessTask(request);
+    : startS3Task(request);
 
 const migrateLegacyLocalTask = async (taskId: string) => {
   const request = await readLegacyLocalRequest(taskId);
@@ -213,6 +220,7 @@ const checkLocalTask = async (taskId: string) => {
     return {
       taskId,
       backend: 'local' as const,
+      storage: 'local' as const,
       status: 'completed' as const,
       progress: 1,
       contentType: 'video/mp4',
@@ -226,6 +234,7 @@ const checkLocalTask = async (taskId: string) => {
   return {
     taskId,
     backend: 'local' as const,
+    storage: 'local' as const,
     status: state.status,
     progress: state.progress,
     error: state.error,
@@ -235,7 +244,7 @@ const checkLocalTask = async (taskId: string) => {
   };
 };
 
-const checkStatelessTask = async (taskId: string) => {
+const checkS3Task = async (taskId: string) => {
   const job = await readJob(taskId);
   const state = await readState(job.statusKey);
   const renderUrl =
@@ -254,7 +263,8 @@ const checkStatelessTask = async (taskId: string) => {
     const object = await headObject(job.outputKey);
     return {
       taskId,
-      backend: 'trigger' as const,
+      backend: job.backend,
+      storage: 's3' as const,
       status: 'completed' as const,
       progress: 1,
       bucket: getS3Bucket(),
@@ -272,7 +282,8 @@ const checkStatelessTask = async (taskId: string) => {
 
   return {
     taskId,
-    backend: 'trigger' as const,
+    backend: job.backend,
+    storage: 's3' as const,
     status: state.status,
     progress: state.progress,
     error: state.error ?? triggerError,
@@ -285,6 +296,6 @@ const checkStatelessTask = async (taskId: string) => {
 };
 
 export const checkGeneratedVideoTask = async (taskId: string) =>
-  executionBackend() === 'local'
+  storageBackend() === 'local'
     ? checkLocalTask(taskId)
-    : checkStatelessTask(taskId);
+    : checkS3Task(taskId);

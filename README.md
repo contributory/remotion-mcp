@@ -10,6 +10,7 @@ MCP server for Remotion with browser-side video generation from AI-authored Reac
 {
   "taskId": "render_...",
   "backend": "local or trigger",
+  "storage": "local or s3",
   "renderUrl": "...",
   "status": "waiting_for_browser"
 }
@@ -24,13 +25,15 @@ Then `check_render_task` returns progress or the final `videoUrl`.
 
 Use `create_composition` when React/Remotion code should be reusable instead of one-off. A stored composition contains the React source, dimensions, FPS, duration, and `defaultProps`.
 
-Stateful mode stores compositions at:
+Stateful mode stores compositions locally by default. If `S3_BUCKET` is configured, stateful mode automatically stores compositions in S3 instead. Stateless mode always uses S3.
+
+Local path:
 
 ```text
 ~/.remotion-mcp/compositions/<compositionId>.json
 ```
 
-Stateless mode stores them in S3 under:
+S3 key:
 
 ```text
 remotion-mcp/compositions/<compositionId>.json
@@ -50,9 +53,12 @@ create_composition
 
 ## Stateful mode
 
-Stateful mode requires **no S3 and no Trigger.dev**.
+Stateful mode never requires Trigger.dev. Storage is selected automatically:
 
-Jobs are persisted under:
+- without `S3_BUCKET`: all persistent data stays local;
+- with `S3_BUCKET`: compositions, job metadata, status, render pages, and MP4 files are all stored in S3.
+
+When local storage is selected, jobs are persisted under:
 
 ```text
 ~/.remotion-mcp/tasks/<taskId>/
@@ -78,13 +84,13 @@ This is the default for a normal stateful machine:
 npm start
 ```
 
-MCP messages use stdio. The same process also starts a small HTTP service, defaulting to:
+MCP messages use stdio. When storage is local, the same process also starts a small HTTP service, defaulting to:
 
 ```text
 http://127.0.0.1:3847
 ```
 
-That HTTP service only serves the browser render page, receives the MP4 upload, and serves completed local videos.
+That HTTP service only serves the browser render page, receives the MP4 upload, and serves completed local videos. If `S3_BUCKET` is configured, stdio mode does not need this local render service because the browser reads/writes directly through presigned S3 URLs.
 
 ### Stateful HTTP
 
@@ -98,7 +104,7 @@ The MCP endpoint is:
 POST http://127.0.0.1:3847/mcp
 ```
 
-The same HTTP service also handles the render page and local MP4 storage.
+When storage is local, the same HTTP service also handles the render page and local MP4 storage. With `S3_BUCKET` configured, `/mcp` still uses HTTP but render pages/status/video live in S3.
 
 Useful settings:
 
@@ -108,7 +114,7 @@ REMOTION_MCP_HTTP_PORT=3847
 REMOTION_MCP_PUBLIC_BASE_URL=http://127.0.0.1:3847
 ```
 
-For a remote stateful server, set `REMOTION_MCP_PUBLIC_BASE_URL` to the URL the user's browser can actually reach.
+For a remote stateful server using local storage, set `REMOTION_MCP_PUBLIC_BASE_URL` to the URL the user's browser can actually reach. This is unnecessary when stateful storage is S3.
 
 ## Stateless mode
 
@@ -130,7 +136,8 @@ POST /mcp
 
 In stateless mode:
 
-- render page, task state, and MP4 are stored in S3;
+- S3 storage is mandatory;
+- render page, task state, compositions, and MP4 are stored in S3;
 - the user's browser uploads directly to S3 using presigned URLs;
 - Trigger.dev tracks the browser-render job;
 - Trigger.dev does not run Chrome, Puppeteer, FFmpeg, or Remotion rendering.
@@ -164,6 +171,26 @@ S3_RENDER_URL_EXPIRES_SECONDS=86400
 ```
 
 The S3 bucket must allow browser `PUT` requests for the presigned upload URLs.
+
+### Stateful with S3
+
+Setting `S3_BUCKET` on a stateful MCP automatically switches **all persistent storage** to S3 while keeping execution stateful:
+
+```bash
+S3_BUCKET=my-video-bucket
+S3_REGION=us-east-1
+```
+
+In this mode task responses use:
+
+```json
+{
+  "backend": "local",
+  "storage": "s3"
+}
+```
+
+Trigger.dev is not used. Stateful transport can still be stdio or HTTP.
 
 Deploy the Trigger.dev tracker with:
 

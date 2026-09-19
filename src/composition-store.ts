@@ -7,7 +7,7 @@ import {
 } from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
-import {executionBackend} from './runtime.js';
+import {storageBackend} from './runtime.js';
 import {
   getTextObject,
   headObject,
@@ -103,7 +103,7 @@ export const createStoredComposition = async ({
   defaultProps: Record<string, unknown>;
   overwrite: boolean;
 }): Promise<StoredCompositionSummary> => {
-  const backend = executionBackend();
+  const backend = storageBackend();
   const exists =
     backend === 'local' ? await localExists(id) : await s3Exists(id);
 
@@ -154,7 +154,7 @@ export const createStoredComposition = async ({
 export const getStoredComposition = async (
   id: string,
 ): Promise<StoredComposition> => {
-  if (executionBackend() === 'local') {
+  if (storageBackend() === 'local') {
     try {
       return await readLocalComposition(id);
     } catch (error) {
@@ -187,7 +187,7 @@ export const getStoredComposition = async (
 export const listStoredCompositions = async (): Promise<
   StoredCompositionSummary[]
 > => {
-  if (executionBackend() === 'local') {
+  if (storageBackend() === 'local') {
     try {
       const entries = await readdir(localCompositionDir(), {
         withFileTypes: true,
