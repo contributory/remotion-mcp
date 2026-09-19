@@ -42,6 +42,23 @@ const atomicJsonWrite = async (path: string, value: unknown) => {
   await rename(temporary, path);
 };
 
+
+export const readLegacyLocalRequest = async (
+  taskId: string,
+): Promise<GeneratedVideoRequest | null> => {
+  const legacyPath = join(rootDir(), 'tasks', `${taskId}.json`);
+
+  try {
+    const record = JSON.parse(await readFile(legacyPath, 'utf8')) as {
+      request?: GeneratedVideoRequest;
+    };
+    return record.request ?? null;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+};
+
 export const createLocalJob = async ({
   taskId,
   request,

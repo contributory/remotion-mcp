@@ -4,6 +4,7 @@ import {compileBrowserPage} from './browser-component.js';
 import {
   createLocalJob,
   localVideoInfo,
+  readLegacyLocalRequest,
   readLocalJob,
   readLocalState,
 } from './local-store.js';
@@ -44,11 +45,15 @@ const localUrls = ({
   const encodedTaskId = encodeURIComponent(taskId);
   const encodedToken = encodeURIComponent(token);
 
+  const renderPath = `/render/${encodedTaskId}?token=${encodedToken}`;
+  const videoPath = `/video/${encodedTaskId}.mp4?token=${encodedToken}`;
+
   return {
-    renderUrl: `${base}/render/${encodedTaskId}?token=${encodedToken}`,
-    statusUploadUrl: `${base}/api/local/jobs/${encodedTaskId}/status?token=${encodedToken}`,
-    videoUploadUrl: `${base}/api/local/jobs/${encodedTaskId}/video?token=${encodedToken}`,
-    videoViewUrl: `${base}/video/${encodedTaskId}.mp4?token=${encodedToken}`,
+    renderUrl: `${base}${renderPath}`,
+    statusUploadUrl: `/api/local/jobs/${encodedTaskId}/status?token=${encodedToken}`,
+    videoUploadUrl: `/api/local/jobs/${encodedTaskId}/video?token=${encodedToken}`,
+    videoViewUrl: videoPath,
+    absoluteVideoViewUrl: `${base}${videoPath}`,
   };
 };
 
@@ -167,9 +172,40 @@ export const startGeneratedVideoTask = async (
     ? startLocalTask(request)
     : startStatelessTask(request);
 
+const migrateLegacyLocalTask = async (taskId: string) => {
+  const request = await readLegacyLocalRequest(taskId);
+  if (!request) return null;
+
+  const token = randomBytes(32).toString('base64url');
+  const urls = localUrls({taskId, token});
+  const renderHtml = await compileBrowserPage({
+    taskId,
+    request,
+    videoUploadUrl: urls.videoUploadUrl,
+    statusUploadUrl: urls.statusUploadUrl,
+    videoViewUrl: urls.videoViewUrl,
+  });
+
+  return createLocalJob({
+    taskId,
+    request,
+    renderHtml,
+    renderToken: token,
+  });
+};
+
 const checkLocalTask = async (taskId: string) => {
+  let job;
+
+  try {
+    job = await readLocalJob(taskId);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    job = await migrateLegacyLocalTask(taskId);
+    if (!job) throw error;
+  }
+
   const state = await readLocalState(taskId);
-  const job = await readLocalJob(taskId);
   const urls = localUrls({taskId, token: job.renderToken});
 
   if (state.status === 'completed') {
@@ -181,7 +217,7 @@ const checkLocalTask = async (taskId: string) => {
       progress: 1,
       contentType: 'video/mp4',
       sizeInBytes: info.size,
-      videoUrl: urls.videoViewUrl,
+      videoUrl: urls.absoluteVideoViewUrl,
       createdAt: job.createdAt,
       updatedAt: state.updatedAt,
     };
