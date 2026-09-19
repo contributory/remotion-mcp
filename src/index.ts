@@ -2,11 +2,15 @@
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as z from 'zod/v4';
+import {
+  checkGeneratedVideoTask,
+  startGeneratedVideoTask,
+} from './async-render.js';
 import {listCompositions, renderFrame, renderVideo} from './remotion.js';
 
 const server = new McpServer({
   name: 'remotion-mcp',
-  version: '1.0.0',
+  version: '1.1.0',
 });
 
 const inputPropsSchema = z
@@ -34,6 +38,86 @@ const asError = (error: unknown) => ({
 });
 
 server.registerTool(
+  'create_video_from_react',
+  {
+    description:
+      'Start an asynchronous Remotion render from React code. The React code must default-export a component. Returns a task ID immediately; use check_render_task to poll it.',
+    inputSchema: {
+      reactCode: z
+        .string()
+        .min(1)
+        .describe(
+          'TSX/JSX source code that default-exports the React component to render. It may import React and Remotion APIs.',
+        ),
+      compositionId: z
+        .string()
+        .min(1)
+        .optional()
+        .default('GeneratedVideo'),
+      durationInFrames: z
+        .number()
+        .int()
+        .positive()
+        .max(216000)
+        .describe('Video duration in frames')
+        .optional()
+        .default(150),
+      fps: z.number().int().positive().max(120).optional().default(30),
+      width: z.number().int().positive().max(7680).optional().default(1920),
+      height: z.number().int().positive().max(4320).optional().default(1080),
+      inputProps: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .default({})
+        .describe('Props passed to the generated React component'),
+    },
+  },
+  async ({
+    reactCode,
+    compositionId,
+    durationInFrames,
+    fps,
+    width,
+    height,
+    inputProps,
+  }) => {
+    try {
+      return asText(
+        await startGeneratedVideoTask({
+          reactCode,
+          compositionId,
+          durationInFrames,
+          fps,
+          width,
+          height,
+          inputProps,
+        }),
+      );
+    } catch (error) {
+      return asError(error);
+    }
+  },
+);
+
+server.registerTool(
+  'check_render_task',
+  {
+    description:
+      'Check an asynchronous video render task. When complete, returns a fresh URL for viewing the rendered video stored in S3.',
+    inputSchema: {
+      taskId: z.string().min(1),
+    },
+  },
+  async ({taskId}) => {
+    try {
+      return asText(await checkGeneratedVideoTask(taskId));
+    } catch (error) {
+      return asError(error);
+    }
+  },
+);
+
+server.registerTool(
   'list_compositions',
   {
     description:
@@ -42,7 +126,9 @@ server.registerTool(
       entryPoint: z
         .string()
         .min(1)
-        .describe('Absolute path, or path relative to the MCP server working directory, to the Remotion entry point'),
+        .describe(
+          'Absolute path, or path relative to the MCP server working directory, to the Remotion entry point',
+        ),
       inputProps: inputPropsSchema,
     },
   },

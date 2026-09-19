@@ -1,4 +1,6 @@
 node_modules/
 dist/
+.remotion-mcp-runtime/
+.remotion-mcp-tasks/
 *.log
 .DS_Store
