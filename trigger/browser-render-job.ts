@@ -12,7 +12,7 @@ export const browserRenderJobTask = task({
     statusKey: string;
     outputKey: string;
   }) => {
-    for (let attempt = 0; attempt < 720; attempt += 1) {
+    for (let attempt = 0; attempt < 1440; attempt += 1) {
       const state = await readState(payload.statusKey);
 
       if (state.status === 'failed') {
@@ -37,9 +37,9 @@ export const browserRenderJobTask = task({
         };
       }
 
-      await wait.for({seconds: 5});
+      await wait.for({minutes: 1});
     }
 
-    throw new Error('Browser render timed out after one hour.');
+    throw new Error('Browser render timed out after 24 hours.');
   },
 });

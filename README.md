@@ -1,47 +1,124 @@
 # remotion-mcp
 
-MCP server for Remotion with browser-side rendering.
+MCP server for Remotion with browser-side video generation from AI-authored React code.
 
-## Browser render flow
+## Async browser-render flow
 
-`create_video_from_react` accepts TSX/JSX that default-exports a React component. The MCP compiles a self-contained HTML render page with React, Remotion, and `@remotion/web-renderer`, stores it in S3, and returns:
+`create_video_from_react` always returns:
 
 ```json
 {
   "taskId": "render_...",
-  "backend": "local",
-  "status": "waiting_for_browser",
-  "renderUrl": "https://..."
+  "backend": "local or trigger",
+  "renderUrl": "...",
+  "status": "waiting_for_browser"
 }
 ```
 
-The user must open `renderUrl` in a browser. That browser performs the Remotion render, uploads the MP4 directly to S3 using a short-lived presigned PUT URL, and updates task status in S3.
+The user opens `renderUrl`. The page uses `@remotion/web-renderer` in the user's browser, shows progress, uploads the finished MP4, and updates the task state.
 
-No Puppeteer, Chrome, or FFmpeg is required on the MCP or Trigger.dev side for this browser-render workflow.
+Then `check_render_task` returns progress or the final `videoUrl`.
 
-`check_render_task` returns `waiting_for_browser`, `rendering`, `uploading`, `failed`, or `completed`. While unfinished it also returns a fresh `renderUrl`. When complete it returns a fresh `videoUrl`.
+## Stateful mode
 
-## Stateful and stateless
+Stateful mode requires **no S3 and no Trigger.dev**.
 
-Both modes render in the user's browser.
+Jobs are persisted under:
 
-- Stateful/default mode stores task state and output in S3; no background worker is required.
-- Stateless mode uses Trigger.dev only to track the remote task lifecycle while the browser still performs the actual render.
-- Set `REMOTION_MCP_STATELESS=true` to force stateless detection.
-- Set `REMOTION_MCP_EXECUTION_MODE=local` or `trigger` to override auto detection.
-
-Trigger.dev task ID: `remotion-browser-render-job`.
-
-## S3
-
-Required:
-
-```bash
-S3_BUCKET=my-video-bucket
-S3_REGION=us-east-1
+```text
+~/.remotion-mcp/tasks/<taskId>/
+  job.json
+  status.json
+  render.html
+  video.mp4
 ```
 
-The normal AWS credential chain is supported. For S3-compatible storage:
+Override the data directory with:
+
+```bash
+REMOTION_MCP_DATA_DIR=/persistent/remotion-mcp
+```
+
+The MCP can use either transport.
+
+### Stateful stdio
+
+This is the default for a normal stateful machine:
+
+```bash
+npm start
+```
+
+MCP messages use stdio. The same process also starts a small HTTP service, defaulting to:
+
+```text
+http://127.0.0.1:3847
+```
+
+That HTTP service only serves the browser render page, receives the MP4 upload, and serves completed local videos.
+
+### Stateful HTTP
+
+```bash
+REMOTION_MCP_TRANSPORT=http npm start
+```
+
+The MCP endpoint is:
+
+```text
+POST http://127.0.0.1:3847/mcp
+```
+
+The same HTTP service also handles the render page and local MP4 storage.
+
+Useful settings:
+
+```bash
+REMOTION_MCP_HTTP_HOST=127.0.0.1
+REMOTION_MCP_HTTP_PORT=3847
+REMOTION_MCP_PUBLIC_BASE_URL=http://127.0.0.1:3847
+```
+
+For a remote stateful server, set `REMOTION_MCP_PUBLIC_BASE_URL` to the URL the user's browser can actually reach.
+
+## Stateless mode
+
+Stateless mode is enabled with:
+
+```bash
+REMOTION_MCP_STATELESS=true
+```
+
+Known serverless environment variables such as Vercel, Lambda, Cloud Run, Azure Functions, Netlify, and Cloudflare Pages also enable it automatically.
+
+**Stateless mode always uses Streamable HTTP MCP transport.** Setting `REMOTION_MCP_TRANSPORT=stdio` is ignored in stateless mode.
+
+The MCP endpoint is:
+
+```text
+POST /mcp
+```
+
+In stateless mode:
+
+- render page, task state, and MP4 are stored in S3;
+- the user's browser uploads directly to S3 using presigned URLs;
+- Trigger.dev tracks the browser-render job;
+- Trigger.dev does not run Chrome, Puppeteer, FFmpeg, or Remotion rendering.
+
+Required configuration:
+
+```bash
+REMOTION_MCP_STATELESS=true
+
+S3_BUCKET=my-video-bucket
+S3_REGION=us-east-1
+
+TRIGGER_SECRET_KEY=tr_...
+TRIGGER_PROJECT_REF=proj_...
+```
+
+S3-compatible services can additionally use:
 
 ```bash
 S3_ENDPOINT=https://...
@@ -50,44 +127,63 @@ S3_SECRET_ACCESS_KEY=...
 S3_FORCE_PATH_STYLE=true
 ```
 
-Render HTML, status updates, and video uploads use presigned S3 URLs. Their default lifetime is 24 hours:
-
-```bash
-S3_RENDER_URL_EXPIRES_SECONDS=86400
-```
-
-The maximum is seven days. `check_render_task` can issue a fresh render URL while the task is unfinished.
-
-For public/CDN-backed completed videos:
+Optional:
 
 ```bash
 S3_PUBLIC_BASE_URL=https://cdn.example.com
+S3_RENDER_URL_EXPIRES_SECONDS=86400
 ```
 
-## Trigger.dev
+The S3 bucket must allow browser `PUT` requests for the presigned upload URLs.
 
-Only stateless/trigger mode requires:
-
-```bash
-TRIGGER_SECRET_KEY=tr_...
-TRIGGER_PROJECT_REF=proj_...
-```
-
-Deploy the tracker task with:
+Deploy the Trigger.dev tracker with:
 
 ```bash
 npm run trigger:deploy
 ```
 
+Trigger task ID:
+
+```text
+remotion-browser-render-job
+```
+
 ## MCP tools
 
-- `create_video_from_react`
-- `check_render_task`
-- `list_compositions`
-- `render_video`
-- `render_still`
+- `create_video_from_react` — accepts TSX/JSX that default-exports a React component and returns `taskId + renderUrl`.
+- `check_render_task` — returns status/progress and eventually `videoUrl`.
+- `list_compositions` — lists compositions from an existing Remotion project.
+- `render_video` — traditional server-side Remotion render.
+- `render_still` — traditional server-side still render.
 
-The last three tools operate on existing Remotion projects and still use the traditional server-side Remotion renderer. The browser-render workflow is used by `create_video_from_react`.
+The last three tools use `@remotion/renderer`; unlike the browser-rendered async flow, server-side rendering may require a compatible local browser.
+
+## Example component
+
+```tsx
+import React from "react";
+import {AbsoluteFill, interpolate, useCurrentFrame} from "remotion";
+
+export default function Video({title = "Hello"}) {
+  const frame = useCurrentFrame();
+  const opacity = interpolate(frame, [0, 30], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "white",
+        fontSize: 96,
+      }}
+    >
+      <div style={{opacity}}>{title}</div>
+    </AbsoluteFill>
+  );
+}
+```
 
 ## Build
 
@@ -95,10 +191,11 @@ The last three tools operate on existing Remotion projects and still use the tra
 npm install
 npm run typecheck
 npm run build
-npm start
 ```
 
-VS Code MCP configuration:
+## VS Code stdio configuration
+
+The repository includes `.vscode/mcp.json`. Equivalent configuration:
 
 ```json
 {

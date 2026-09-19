@@ -9,5 +9,5 @@ if (!project) {
 export default defineConfig({
   project,
   dirs: ['./trigger'],
-  maxDuration: 3600,
+  maxDuration: 86400,
 });

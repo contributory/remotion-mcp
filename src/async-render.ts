@@ -1,6 +1,12 @@
-import {randomUUID} from 'node:crypto';
+import {randomBytes, randomUUID} from 'node:crypto';
 import {runs, tasks} from '@trigger.dev/sdk';
 import {compileBrowserPage} from './browser-component.js';
+import {
+  createLocalJob,
+  localVideoInfo,
+  readLocalJob,
+  readLocalState,
+} from './local-store.js';
 import {
   outputKey,
   readJob,
@@ -18,52 +24,65 @@ import {
   headObject,
   putObject,
 } from './s3.js';
+import {
+  executionBackend,
+  publicBaseUrl,
+} from './runtime.js';
 import type {
   BrowserRenderJob,
   GeneratedVideoRequest,
 } from './task-types.js';
 
-const isTruthy = (value: string | undefined): boolean =>
-  value === '1' || value === 'true' || value === 'yes';
-
-const isStatelessEnvironment = (): boolean => {
-  if (isTruthy(process.env.REMOTION_MCP_STATELESS)) {
-    return true;
-  }
-
-  return Boolean(
-    process.env.VERCEL ||
-      process.env.AWS_LAMBDA_FUNCTION_NAME ||
-      process.env.K_SERVICE ||
-      process.env.FUNCTIONS_WORKER_RUNTIME ||
-      process.env.NETLIFY ||
-      process.env.CF_PAGES,
-  );
-};
-
-export const executionBackend = (): 'local' | 'trigger' => {
-  const configured = process.env.REMOTION_MCP_EXECUTION_MODE?.toLowerCase();
-  if (configured === 'local' || configured === 'trigger') {
-    return configured;
-  }
-
-  return isStatelessEnvironment() ? 'trigger' : 'local';
-};
-
-export const startGeneratedVideoTask = async (
-  request: GeneratedVideoRequest,
-): Promise<{
+const localUrls = ({
+  taskId,
+  token,
+}: {
   taskId: string;
-  backend: 'local' | 'trigger';
-  renderUrl: string;
-  status: 'waiting_for_browser';
-}> => {
-  const backend = executionBackend();
+  token: string;
+}) => {
+  const base = publicBaseUrl();
+  const encodedTaskId = encodeURIComponent(taskId);
+  const encodedToken = encodeURIComponent(token);
 
-  if (backend === 'trigger' && !process.env.TRIGGER_SECRET_KEY) {
-    throw new Error(
-      'TRIGGER_SECRET_KEY is required for stateless/Trigger.dev mode.',
-    );
+  return {
+    renderUrl: `${base}/render/${encodedTaskId}?token=${encodedToken}`,
+    statusUploadUrl: `${base}/api/local/jobs/${encodedTaskId}/status?token=${encodedToken}`,
+    videoUploadUrl: `${base}/api/local/jobs/${encodedTaskId}/video?token=${encodedToken}`,
+    videoViewUrl: `${base}/video/${encodedTaskId}.mp4?token=${encodedToken}`,
+  };
+};
+
+const startLocalTask = async (request: GeneratedVideoRequest) => {
+  const taskId = `render_${randomUUID()}`;
+  const token = randomBytes(32).toString('base64url');
+  const urls = localUrls({taskId, token});
+
+  const renderHtml = await compileBrowserPage({
+    taskId,
+    request,
+    videoUploadUrl: urls.videoUploadUrl,
+    statusUploadUrl: urls.statusUploadUrl,
+    videoViewUrl: urls.videoViewUrl,
+  });
+
+  await createLocalJob({
+    taskId,
+    request,
+    renderHtml,
+    renderToken: token,
+  });
+
+  return {
+    taskId,
+    backend: 'local' as const,
+    renderUrl: urls.renderUrl,
+    status: 'waiting_for_browser' as const,
+  };
+};
+
+const startStatelessTask = async (request: GeneratedVideoRequest) => {
+  if (!process.env.TRIGGER_SECRET_KEY) {
+    throw new Error('TRIGGER_SECRET_KEY is required in stateless mode.');
   }
 
   const taskId = `render_${randomUUID()}`;
@@ -97,7 +116,7 @@ export const startGeneratedVideoTask = async (
 
   const job: BrowserRenderJob = {
     id: taskId,
-    backend,
+    backend: 'trigger',
     createdAt,
     compositionId: request.compositionId,
     durationInFrames: request.durationInFrames,
@@ -124,25 +143,63 @@ export const startGeneratedVideoTask = async (
     }),
   ]);
 
-  if (backend === 'trigger') {
-    const handle = await tasks.trigger('remotion-browser-render-job', {
+  const handle = await tasks.trigger('remotion-browser-render-job', {
+    taskId,
+    statusKey: jobStatusKey,
+    outputKey: jobOutputKey,
+  });
+
+  job.triggerRunId = handle.id;
+  await saveJob(job);
+
+  return {
+    taskId,
+    backend: 'trigger' as const,
+    renderUrl: await getObjectUrl(jobRenderKey),
+    status: 'waiting_for_browser' as const,
+  };
+};
+
+export const startGeneratedVideoTask = async (
+  request: GeneratedVideoRequest,
+) =>
+  executionBackend() === 'local'
+    ? startLocalTask(request)
+    : startStatelessTask(request);
+
+const checkLocalTask = async (taskId: string) => {
+  const state = await readLocalState(taskId);
+  const job = await readLocalJob(taskId);
+  const urls = localUrls({taskId, token: job.renderToken});
+
+  if (state.status === 'completed') {
+    const info = await localVideoInfo(taskId);
+    return {
       taskId,
-      statusKey: jobStatusKey,
-      outputKey: jobOutputKey,
-    });
-    job.triggerRunId = handle.id;
-    await saveJob(job);
+      backend: 'local' as const,
+      status: 'completed' as const,
+      progress: 1,
+      contentType: 'video/mp4',
+      sizeInBytes: info.size,
+      videoUrl: urls.videoViewUrl,
+      createdAt: job.createdAt,
+      updatedAt: state.updatedAt,
+    };
   }
 
   return {
     taskId,
-    backend,
-    renderUrl: await getObjectUrl(jobRenderKey),
-    status: 'waiting_for_browser',
+    backend: 'local' as const,
+    status: state.status,
+    progress: state.progress,
+    error: state.error,
+    renderUrl: urls.renderUrl,
+    createdAt: job.createdAt,
+    updatedAt: state.updatedAt,
   };
 };
 
-export const checkGeneratedVideoTask = async (taskId: string) => {
+const checkStatelessTask = async (taskId: string) => {
   const job = await readJob(taskId);
   const state = await readState(job.statusKey);
   const renderUrl =
@@ -151,7 +208,7 @@ export const checkGeneratedVideoTask = async (taskId: string) => {
   let triggerStatus: string | undefined;
   let triggerError: string | undefined;
 
-  if (job.backend === 'trigger' && job.triggerRunId) {
+  if (job.triggerRunId) {
     const run = await runs.retrieve(job.triggerRunId);
     triggerStatus = run.status;
     triggerError = run.error?.message;
@@ -161,7 +218,7 @@ export const checkGeneratedVideoTask = async (taskId: string) => {
     const object = await headObject(job.outputKey);
     return {
       taskId,
-      backend: job.backend,
+      backend: 'trigger' as const,
       status: 'completed' as const,
       progress: 1,
       bucket: getS3Bucket(),
@@ -179,7 +236,7 @@ export const checkGeneratedVideoTask = async (taskId: string) => {
 
   return {
     taskId,
-    backend: job.backend,
+    backend: 'trigger' as const,
     status: state.status,
     progress: state.progress,
     error: state.error ?? triggerError,
@@ -190,3 +247,8 @@ export const checkGeneratedVideoTask = async (taskId: string) => {
     updatedAt: state.updatedAt,
   };
 };
+
+export const checkGeneratedVideoTask = async (taskId: string) =>
+  executionBackend() === 'local'
+    ? checkLocalTask(taskId)
+    : checkStatelessTask(taskId);

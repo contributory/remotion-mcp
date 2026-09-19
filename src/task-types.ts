@@ -22,9 +22,17 @@ export type BrowserRenderState = {
   error?: string;
 };
 
+export type LocalBrowserRenderJob = {
+  id: string;
+  backend: 'local';
+  createdAt: string;
+  request: GeneratedVideoRequest;
+  renderToken: string;
+};
+
 export type BrowserRenderJob = {
   id: string;
-  backend: 'local' | 'trigger';
+  backend: 'trigger';
   createdAt: string;
   compositionId: string;
   durationInFrames: number;
