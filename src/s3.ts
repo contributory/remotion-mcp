@@ -1,6 +1,7 @@
 import {
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   type S3ClientConfig,
@@ -79,6 +80,31 @@ export const getTextObject = async (key: string): Promise<string> => {
   }
 
   return response.Body.transformToString();
+};
+
+export const listObjectKeys = async (prefix: string): Promise<string[]> => {
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await getClient().send(
+      new ListObjectsV2Command({
+        Bucket: getS3Bucket(),
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    for (const object of response.Contents ?? []) {
+      if (object.Key) keys.push(object.Key);
+    }
+
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
+  return keys;
 };
 
 export const getObjectUrl = async (key: string): Promise<string> =>

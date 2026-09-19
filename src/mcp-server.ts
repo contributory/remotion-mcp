@@ -4,7 +4,25 @@ import {
   checkGeneratedVideoTask,
   startGeneratedVideoTask,
 } from './async-render.js';
-import {listCompositions, renderFrame, renderVideo} from './remotion.js';
+import {
+  listCompositions as listProjectCompositions,
+  renderFrame,
+  renderVideo,
+} from './remotion.js';
+import {
+  createStoredComposition,
+  getStoredComposition,
+  listStoredCompositions,
+} from './composition-store.js';
+
+const compositionIdSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(
+    /^[A-Za-z0-9_-]+$/,
+    'Composition ID may only contain letters, numbers, underscores, and hyphens',
+  );
 
 const inputPropsSchema = z
   .record(z.string(), z.unknown())
@@ -33,8 +51,145 @@ const asError = (error: unknown) => ({
 export const createMcpServer = () => {
   const server = new McpServer({
     name: 'remotion-mcp',
-    version: '1.3.0',
+    version: '1.4.0',
   });
+
+  server.registerTool(
+    'create_composition',
+    {
+      description:
+        'Persist a reusable React/Remotion composition. Stateful environments store it on local disk; stateless environments store it in S3.',
+      inputSchema: {
+        compositionId: compositionIdSchema.describe(
+          'Stable ID used to list and render this composition later',
+        ),
+        reactCode: z
+          .string()
+          .min(1)
+          .describe('TSX/JSX source that default-exports the React component'),
+        durationInFrames: z
+          .number()
+          .int()
+          .positive()
+          .max(216000)
+          .optional()
+          .default(150),
+        fps: z.number().int().positive().max(120).optional().default(30),
+        width: z.number().int().positive().max(7680).optional().default(1920),
+        height: z.number().int().positive().max(4320).optional().default(1080),
+        defaultProps: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .default({})
+          .describe('Default props used whenever this composition is rendered'),
+        overwrite: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe('Replace an existing composition with the same ID'),
+      },
+    },
+    async ({
+      compositionId,
+      reactCode,
+      durationInFrames,
+      fps,
+      width,
+      height,
+      defaultProps,
+      overwrite,
+    }) => {
+      try {
+        return asText(
+          await createStoredComposition({
+            id: compositionId,
+            reactCode,
+            durationInFrames,
+            fps,
+            width,
+            height,
+            defaultProps,
+            overwrite,
+          }),
+        );
+      } catch (error) {
+        return asError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_compositions',
+    {
+      description:
+        'List reusable compositions persisted by create_composition. Returns metadata only, not the full React source.',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return asText(await listStoredCompositions());
+      } catch (error) {
+        return asError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_composition',
+    {
+      description:
+        'Get one persisted composition including its React source and default props.',
+      inputSchema: {
+        compositionId: compositionIdSchema,
+      },
+    },
+    async ({compositionId}) => {
+      try {
+        return asText(await getStoredComposition(compositionId));
+      } catch (error) {
+        return asError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'create_video_from_composition',
+    {
+      description:
+        'Start a browser-rendered video task from a persisted composition. Returns taskId and renderUrl; the user must open renderUrl in a browser.',
+      inputSchema: {
+        compositionId: compositionIdSchema,
+        inputProps: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .default({})
+          .describe(
+            'Props for this render. These override the stored defaultProps.',
+          ),
+      },
+    },
+    async ({compositionId, inputProps}) => {
+      try {
+        const composition = await getStoredComposition(compositionId);
+        return asText(
+          await startGeneratedVideoTask({
+            reactCode: composition.reactCode,
+            compositionId: composition.id,
+            durationInFrames: composition.durationInFrames,
+            fps: composition.fps,
+            width: composition.width,
+            height: composition.height,
+            inputProps: {
+              ...composition.defaultProps,
+              ...inputProps,
+            },
+          }),
+        );
+      } catch (error) {
+        return asError(error);
+      }
+    },
+  );
 
   server.registerTool(
     'create_video_from_react',
@@ -48,7 +203,7 @@ export const createMcpServer = () => {
           .describe(
             'TSX/JSX source code that default-exports the React component to render. It may import React and Remotion APIs.',
           ),
-        compositionId: z.string().min(1).optional().default('GeneratedVideo'),
+        compositionId: compositionIdSchema.optional().default('GeneratedVideo'),
         durationInFrames: z
           .number()
           .int()
@@ -112,10 +267,10 @@ export const createMcpServer = () => {
   );
 
   server.registerTool(
-    'list_compositions',
+    'list_project_compositions',
     {
       description:
-        'Bundle a Remotion project and list all compositions with dimensions, FPS, and duration.',
+        'Bundle a traditional Remotion project and list its compositions. This is separate from the persisted composition registry.',
       inputSchema: {
         entryPoint: z
           .string()
@@ -128,7 +283,7 @@ export const createMcpServer = () => {
     },
     async ({entryPoint, inputProps}) => {
       try {
-        return asText(await listCompositions(entryPoint, inputProps));
+        return asText(await listProjectCompositions(entryPoint, inputProps));
       } catch (error) {
         return asError(error);
       }

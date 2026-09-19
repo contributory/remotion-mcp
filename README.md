@@ -19,6 +19,35 @@ The user opens `renderUrl`. The page uses `@remotion/web-renderer` in the user's
 
 Then `check_render_task` returns progress or the final `videoUrl`.
 
+
+## Reusable composition registry
+
+Use `create_composition` when React/Remotion code should be reusable instead of one-off. A stored composition contains the React source, dimensions, FPS, duration, and `defaultProps`.
+
+Stateful mode stores compositions at:
+
+```text
+~/.remotion-mcp/compositions/<compositionId>.json
+```
+
+Stateless mode stores them in S3 under:
+
+```text
+remotion-mcp/compositions/<compositionId>.json
+```
+
+Typical workflow:
+
+```text
+create_composition
+  -> list_compositions
+  -> create_video_from_composition
+  -> open renderUrl
+  -> check_render_task
+```
+
+`create_video_from_composition` merges the saved `defaultProps` with per-render `inputProps`; per-render values win. `create_composition` refuses to replace an existing ID unless `overwrite: true` is passed.
+
 ## Stateful mode
 
 Stateful mode requires **no S3 and no Trigger.dev**.
@@ -150,13 +179,17 @@ remotion-browser-render-job
 
 ## MCP tools
 
-- `create_video_from_react` — accepts TSX/JSX that default-exports a React component and returns `taskId + renderUrl`.
-- `check_render_task` — returns status/progress and eventually `videoUrl`.
-- `list_compositions` — lists compositions from an existing Remotion project.
+- `create_composition` — create or explicitly overwrite a reusable persisted composition.
+- `list_compositions` — list persisted composition metadata.
+- `get_composition` — get one persisted composition including React source.
+- `create_video_from_composition` — render a persisted composition through the browser-render workflow.
+- `create_video_from_react` — one-off browser render without persisting a composition.
+- `check_render_task` — return status/progress and eventually `videoUrl`.
+- `list_project_compositions` — inspect compositions from a traditional Remotion project entry point.
 - `render_video` — traditional server-side Remotion render.
 - `render_still` — traditional server-side still render.
 
-The last three tools use `@remotion/renderer`; unlike the browser-rendered async flow, server-side rendering may require a compatible local browser.
+`list_project_compositions`, `render_video`, and `render_still` use the traditional server-side Remotion project workflow and may require a compatible local browser.
 
 ## Example component
 
