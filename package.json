@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.trigger.json",
     "trigger:dev": "trigger.dev dev",
     "trigger:deploy": "trigger.dev deploy",
-    "start:http": "REMOTION_MCP_TRANSPORT=http node dist/index.js"
+    "start:http": "REMOTION_MCP_TRANSPORT=http node dist/index.js",
+    "typecheck:nhost": "tsc -p tsconfig.nhost.json --noEmit",
+    "build:nhost": "node nhost-adapter/scripts/build.mjs"
   },
   "keywords": [],
   "author": "",

@@ -1,55 +1,21 @@
-"use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+// nhost-adapter/entry.ts
+import { timingSafeEqual } from "node:crypto";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
-// adapter-src/runtime.ts
-var runtime_exports = {};
-__export(runtime_exports, {
-  handle8BaseWebhook: () => handle8BaseWebhook
-});
-module.exports = __toCommonJS(runtime_exports);
-var import_node_crypto2 = require("node:crypto");
-var import_webStandardStreamableHttp = require("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
+// nhost-adapter/mcp-server.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import * as z from "zod/v4";
 
-// adapter-src/mcp-server.ts
-var import_mcp = require("@modelcontextprotocol/sdk/server/mcp.js");
-var z = __toESM(require("zod"));
+// src/async-render.ts
+import { randomBytes, randomUUID } from "node:crypto";
+import { runs, tasks } from "@trigger.dev/sdk";
 
-// ../src/async-render.ts
-var import_node_crypto = require("node:crypto");
-var import_sdk = require("@trigger.dev/sdk");
-
-// adapter-src/browser-component.ts
-var import_node_path = require("node:path");
-var import_node_module = require("node:module");
-var import_esbuild = require("esbuild");
-var require2 = (0, import_node_module.createRequire)(__filename);
-var packageRoot = (0, import_node_path.dirname)(require2.resolve("remotion/package.json"));
+// nhost-adapter/browser-component.ts
+import { dirname } from "node:path";
+import { createRequire } from "node:module";
+import { build } from "esbuild";
+var require2 = createRequire(import.meta.url);
+var packageRoot = dirname(require2.resolve("remotion/package.json"));
 var userComponentPlugin = (reactCode) => ({
   name: "remotion-mcp-user-component",
   setup(buildApi) {
@@ -226,7 +192,7 @@ const run = async () => {
 
 void run();
 `;
-  const result = await (0, import_esbuild.build)({
+  const result = await build({
     stdin: {
       contents: entry,
       sourcefile: "remotion-mcp-browser-runner.tsx",
@@ -278,25 +244,32 @@ void run();
 </html>`;
 };
 
-// ../src/local-store.ts
-var import_promises = require("node:fs/promises");
-var import_node_os = require("node:os");
-var import_node_path2 = require("node:path");
-var rootDir = () => process.env.REMOTION_MCP_DATA_DIR ?? (0, import_node_path2.join)((0, import_node_os.homedir)(), ".remotion-mcp");
-var taskDir = (taskId) => (0, import_node_path2.join)(rootDir(), "tasks", taskId);
-var jobPath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "job.json");
-var statusPath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "status.json");
-var renderPagePath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "render.html");
-var videoPath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "video.mp4");
+// src/local-store.ts
+import {
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile
+} from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+var rootDir = () => process.env.REMOTION_MCP_DATA_DIR ?? join(homedir(), ".remotion-mcp");
+var taskDir = (taskId) => join(rootDir(), "tasks", taskId);
+var jobPath = (taskId) => join(taskDir(taskId), "job.json");
+var statusPath = (taskId) => join(taskDir(taskId), "status.json");
+var renderPagePath = (taskId) => join(taskDir(taskId), "render.html");
+var videoPath = (taskId) => join(taskDir(taskId), "video.mp4");
 var atomicJsonWrite = async (path, value) => {
   const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
-  await (0, import_promises.writeFile)(temporary, JSON.stringify(value, null, 2), "utf8");
-  await (0, import_promises.rename)(temporary, path);
+  await writeFile(temporary, JSON.stringify(value, null, 2), "utf8");
+  await rename(temporary, path);
 };
 var readLegacyLocalRequest = async (taskId) => {
-  const legacyPath = (0, import_node_path2.join)(rootDir(), "tasks", `${taskId}.json`);
+  const legacyPath = join(rootDir(), "tasks", `${taskId}.json`);
   try {
-    const record2 = JSON.parse(await (0, import_promises.readFile)(legacyPath, "utf8"));
+    const record2 = JSON.parse(await readFile(legacyPath, "utf8"));
     return record2.request ?? null;
   } catch (error) {
     if (error.code === "ENOENT") return null;
@@ -309,7 +282,7 @@ var createLocalJob = async ({
   renderHtml,
   renderToken
 }) => {
-  await (0, import_promises.mkdir)(taskDir(taskId), { recursive: true });
+  await mkdir(taskDir(taskId), { recursive: true });
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   const job = {
     id: taskId,
@@ -325,17 +298,23 @@ var createLocalJob = async ({
       progress: 0,
       updatedAt: createdAt
     }),
-    (0, import_promises.writeFile)(renderPagePath(taskId), renderHtml, "utf8")
+    writeFile(renderPagePath(taskId), renderHtml, "utf8")
   ]);
   return job;
 };
-var readLocalJob = async (taskId) => JSON.parse(await (0, import_promises.readFile)(jobPath(taskId), "utf8"));
-var readLocalState = async (taskId) => JSON.parse(await (0, import_promises.readFile)(statusPath(taskId), "utf8"));
-var localVideoInfo = async (taskId) => (0, import_promises.stat)(videoPath(taskId));
+var readLocalJob = async (taskId) => JSON.parse(await readFile(jobPath(taskId), "utf8"));
+var readLocalState = async (taskId) => JSON.parse(await readFile(statusPath(taskId), "utf8"));
+var localVideoInfo = async (taskId) => stat(videoPath(taskId));
 
-// ../src/s3.ts
-var import_client_s3 = require("@aws-sdk/client-s3");
-var import_s3_request_presigner = require("@aws-sdk/s3-request-presigner");
+// src/s3.ts
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 var required = (name) => {
   const value = process.env[name];
   if (!value) {
@@ -359,7 +338,7 @@ var getClient = () => {
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
     };
   }
-  return new import_client_s3.S3Client(config);
+  return new S3Client(config);
 };
 var getS3Bucket = () => required("S3_BUCKET");
 var signedLifetime = () => Math.min(
@@ -372,7 +351,7 @@ var putObject = async ({
   contentType
 }) => {
   await getClient().send(
-    new import_client_s3.PutObjectCommand({
+    new PutObjectCommand({
       Bucket: getS3Bucket(),
       Key: key,
       Body: body,
@@ -383,7 +362,7 @@ var putObject = async ({
 };
 var getTextObject = async (key) => {
   const response = await getClient().send(
-    new import_client_s3.GetObjectCommand({
+    new GetObjectCommand({
       Bucket: getS3Bucket(),
       Key: key
     })
@@ -398,7 +377,7 @@ var listObjectKeys = async (prefix) => {
   let continuationToken;
   do {
     const response = await getClient().send(
-      new import_client_s3.ListObjectsV2Command({
+      new ListObjectsV2Command({
         Bucket: getS3Bucket(),
         Prefix: prefix,
         ContinuationToken: continuationToken
@@ -411,9 +390,9 @@ var listObjectKeys = async (prefix) => {
   } while (continuationToken);
   return keys;
 };
-var getObjectUrl = async (key) => (0, import_s3_request_presigner.getSignedUrl)(
+var getObjectUrl = async (key) => getSignedUrl(
   getClient(),
-  new import_client_s3.GetObjectCommand({
+  new GetObjectCommand({
     Bucket: getS3Bucket(),
     Key: key
   }),
@@ -422,9 +401,9 @@ var getObjectUrl = async (key) => (0, import_s3_request_presigner.getSignedUrl)(
 var createPutUrl = async ({
   key,
   contentType
-}) => (0, import_s3_request_presigner.getSignedUrl)(
+}) => getSignedUrl(
   getClient(),
-  new import_client_s3.PutObjectCommand({
+  new PutObjectCommand({
     Bucket: getS3Bucket(),
     Key: key,
     ContentType: contentType
@@ -432,7 +411,7 @@ var createPutUrl = async ({
   { expiresIn: signedLifetime() }
 );
 var headObject = async (key) => getClient().send(
-  new import_client_s3.HeadObjectCommand({
+  new HeadObjectCommand({
     Bucket: getS3Bucket(),
     Key: key
   })
@@ -448,7 +427,7 @@ var getVideoUrl = async ({
   return getObjectUrl(key);
 };
 
-// ../src/job-store.ts
+// src/job-store.ts
 var jobKey = (taskId) => `remotion-mcp/jobs/${taskId}/job.json`;
 var renderKey = (taskId) => `remotion-mcp/jobs/${taskId}/render.html`;
 var statusKey = (taskId) => `remotion-mcp/jobs/${taskId}/status.json`;
@@ -470,7 +449,7 @@ var saveState = async (key, state) => {
 };
 var readState = async (key) => JSON.parse(await getTextObject(key));
 
-// ../src/runtime.ts
+// src/runtime.ts
 var isTruthy = (value) => value === "1" || value === "true" || value === "yes";
 var isStatelessEnvironment = () => isTruthy(process.env.REMOTION_MCP_STATELESS) || Boolean(
   process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.K_SERVICE || process.env.FUNCTIONS_WORKER_RUNTIME || process.env.NETLIFY || process.env.CF_PAGES
@@ -484,7 +463,7 @@ var publicBaseUrl = () => {
   return `http://127.0.0.1:${httpPort()}`;
 };
 
-// ../src/async-render.ts
+// src/async-render.ts
 var localUrls = ({
   taskId,
   token
@@ -503,8 +482,8 @@ var localUrls = ({
   };
 };
 var startLocalTask = async (request) => {
-  const taskId = `render_${(0, import_node_crypto.randomUUID)()}`;
-  const token = (0, import_node_crypto.randomBytes)(32).toString("base64url");
+  const taskId = `render_${randomUUID()}`;
+  const token = randomBytes(32).toString("base64url");
   const urls = localUrls({ taskId, token });
   const renderHtml = await compileBrowserPage({
     taskId,
@@ -532,7 +511,7 @@ var startS3Task = async (request) => {
   if (backend === "trigger" && !process.env.TRIGGER_SECRET_KEY) {
     throw new Error("TRIGGER_SECRET_KEY is required in stateless mode.");
   }
-  const taskId = `render_${(0, import_node_crypto.randomUUID)()}`;
+  const taskId = `render_${randomUUID()}`;
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   const jobRenderKey = renderKey(taskId);
   const jobStatusKey = statusKey(taskId);
@@ -586,7 +565,7 @@ var startS3Task = async (request) => {
     })
   ]);
   if (backend === "trigger") {
-    const handle = await import_sdk.tasks.trigger("remotion-browser-render-job", {
+    const handle = await tasks.trigger("remotion-browser-render-job", {
       taskId,
       statusKey: jobStatusKey,
       outputKey: jobOutputKey
@@ -606,7 +585,7 @@ var startGeneratedVideoTask = async (request) => storageBackend() === "local" ? 
 var migrateLegacyLocalTask = async (taskId) => {
   const request = await readLegacyLocalRequest(taskId);
   if (!request) return null;
-  const token = (0, import_node_crypto.randomBytes)(32).toString("base64url");
+  const token = randomBytes(32).toString("base64url");
   const urls = localUrls({ taskId, token });
   const renderHtml = await compileBrowserPage({
     taskId,
@@ -667,7 +646,7 @@ var checkS3Task = async (taskId) => {
   let triggerStatus;
   let triggerError;
   if (job.triggerRunId) {
-    const run = await import_sdk.runs.retrieve(job.triggerRunId);
+    const run = await runs.retrieve(job.triggerRunId);
     triggerStatus = run.status;
     triggerError = run.error?.message;
   }
@@ -707,13 +686,19 @@ var checkS3Task = async (taskId) => {
 };
 var checkGeneratedVideoTask = async (taskId) => storageBackend() === "local" ? checkLocalTask(taskId) : checkS3Task(taskId);
 
-// ../src/composition-store.ts
-var import_promises2 = require("node:fs/promises");
-var import_node_os2 = require("node:os");
-var import_node_path3 = require("node:path");
-var localRoot = () => process.env.REMOTION_MCP_DATA_DIR ?? (0, import_node_path3.join)((0, import_node_os2.homedir)(), ".remotion-mcp");
-var localCompositionDir = () => (0, import_node_path3.join)(localRoot(), "compositions");
-var localCompositionPath = (id) => (0, import_node_path3.join)(localCompositionDir(), `${encodeURIComponent(id)}.json`);
+// src/composition-store.ts
+import {
+  mkdir as mkdir2,
+  readFile as readFile2,
+  readdir,
+  rename as rename2,
+  writeFile as writeFile2
+} from "node:fs/promises";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
+var localRoot = () => process.env.REMOTION_MCP_DATA_DIR ?? join2(homedir2(), ".remotion-mcp");
+var localCompositionDir = () => join2(localRoot(), "compositions");
+var localCompositionPath = (id) => join2(localCompositionDir(), `${encodeURIComponent(id)}.json`);
 var s3Prefix = "remotion-mcp/compositions/";
 var s3CompositionKey = (id) => `${s3Prefix}${encodeURIComponent(id)}.json`;
 var toSummary = (composition) => {
@@ -721,11 +706,11 @@ var toSummary = (composition) => {
   return summary;
 };
 var readLocalComposition = async (id) => JSON.parse(
-  await (0, import_promises2.readFile)(localCompositionPath(id), "utf8")
+  await readFile2(localCompositionPath(id), "utf8")
 );
 var localExists = async (id) => {
   try {
-    await (0, import_promises2.readFile)(localCompositionPath(id), "utf8");
+    await readFile2(localCompositionPath(id), "utf8");
     return true;
   } catch (error) {
     if (error.code === "ENOENT") return false;
@@ -775,15 +760,15 @@ var createStoredComposition = async ({
     updatedAt: now
   };
   if (backend === "local") {
-    await (0, import_promises2.mkdir)(localCompositionDir(), { recursive: true });
+    await mkdir2(localCompositionDir(), { recursive: true });
     const target = localCompositionPath(id);
     const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
-    await (0, import_promises2.writeFile)(
+    await writeFile2(
       temporary,
       JSON.stringify(composition, null, 2),
       "utf8"
     );
-    await (0, import_promises2.rename)(temporary, target);
+    await rename2(temporary, target);
   } else {
     await putObject({
       key: s3CompositionKey(id),
@@ -820,7 +805,7 @@ var getStoredComposition = async (id) => {
 var listStoredCompositions = async () => {
   if (storageBackend() === "local") {
     try {
-      const entries = await (0, import_promises2.readdir)(localCompositionDir(), {
+      const entries = await readdir(localCompositionDir(), {
         withFileTypes: true
       });
       const compositions2 = await Promise.all(
@@ -828,8 +813,8 @@ var listStoredCompositions = async () => {
           (entry) => entry.isFile() && entry.name.endsWith(".json")
         ).map(async (entry) => {
           const parsed = JSON.parse(
-            await (0, import_promises2.readFile)(
-              (0, import_node_path3.join)(localCompositionDir(), entry.name),
+            await readFile2(
+              join2(localCompositionDir(), entry.name),
               "utf8"
             )
           );
@@ -859,7 +844,7 @@ var listStoredCompositions = async () => {
   return compositions.sort((a, b) => a.id.localeCompare(b.id));
 };
 
-// adapter-src/mcp-server.ts
+// nhost-adapter/mcp-server.ts
 var compositionIdSchema = z.string().min(1).max(120).regex(
   /^[A-Za-z0-9_-]+$/,
   "Composition ID may only contain letters, numbers, underscores, and hyphens"
@@ -882,20 +867,20 @@ var asError = (error) => ({
   ],
   isError: true
 });
-var unsupportedOn8Base = () => asError(
+var unsupportedInCloudFunction = () => asError(
   new Error(
-    "This traditional server-side Remotion tool is not supported by the 8base compatibility adapter. Use the persisted composition + browser-render tools instead."
+    "This traditional server-side Remotion tool is disabled in the Nhost Function deployment. Use persisted compositions and browser rendering instead."
   )
 );
-var create8BaseMcpServer = () => {
-  const server = new import_mcp.McpServer({
+var createNhostMcpServer = () => {
+  const server = new McpServer({
     name: "remotion-mcp",
-    version: "1.5.0-8base"
+    version: "1.5.0-nhost"
   });
   server.registerTool(
     "create_composition",
     {
-      description: "Persist a reusable React/Remotion composition in S3 for the 8base deployment.",
+      description: "Persist a reusable React/Remotion composition in S3 for the Nhost Function deployment.",
       inputSchema: {
         compositionId: compositionIdSchema,
         reactCode: z.string().min(1),
@@ -952,7 +937,7 @@ var create8BaseMcpServer = () => {
   server.registerTool(
     "get_composition",
     {
-      description: "Get one persisted composition including React source and default props.",
+      description: "Get one persisted composition including its React source and default props.",
       inputSchema: {
         compositionId: compositionIdSchema
       }
@@ -1055,18 +1040,18 @@ var create8BaseMcpServer = () => {
   server.registerTool(
     "list_project_compositions",
     {
-      description: "Traditional filesystem Remotion project inspection. Not available on 8base Functions.",
+      description: "Traditional filesystem Remotion project inspection. Disabled in the Nhost Function deployment.",
       inputSchema: {
         entryPoint: z.string().min(1),
         inputProps: inputPropsSchema
       }
     },
-    async () => unsupportedOn8Base()
+    async () => unsupportedInCloudFunction()
   );
   server.registerTool(
     "render_video",
     {
-      description: "Traditional server-side Remotion rendering. Not available on 8base Functions.",
+      description: "Traditional server-side Remotion rendering. Disabled in the Nhost Function deployment.",
       inputSchema: {
         entryPoint: z.string().min(1),
         compositionId: z.string().min(1),
@@ -1076,12 +1061,12 @@ var create8BaseMcpServer = () => {
         concurrency: z.number().int().positive().optional()
       }
     },
-    async () => unsupportedOn8Base()
+    async () => unsupportedInCloudFunction()
   );
   server.registerTool(
     "render_still",
     {
-      description: "Traditional server-side still rendering. Not available on 8base Functions.",
+      description: "Traditional server-side still rendering. Disabled in the Nhost Function deployment.",
       inputSchema: {
         entryPoint: z.string().min(1),
         compositionId: z.string().min(1),
@@ -1091,50 +1076,18 @@ var create8BaseMcpServer = () => {
         imageFormat: z.enum(["png", "jpeg", "webp"]).optional().default("png")
       }
     },
-    async () => unsupportedOn8Base()
+    async () => unsupportedInCloudFunction()
   );
   return server;
 };
 
-// adapter-src/runtime.ts
-var normalizeEvent = (event) => event?.event && typeof event.event === "object" ? event.event : event;
-var getHeader = (headers, name) => {
-  if (!headers) return void 0;
-  const lower = name.toLowerCase();
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === lower && value != null) {
-      return String(value);
-    }
-  }
-  return void 0;
-};
-var secureEqual = (left, right) => {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && (0, import_node_crypto2.timingSafeEqual)(a, b);
-};
-var unauthorized = () => ({
-  statusCode: 401,
-  headers: {
-    "content-type": "application/json",
-    "www-authenticate": "Bearer"
-  },
-  body: JSON.stringify({
-    error: "Unauthorized"
-  })
-});
-var validateBearerToken = (headers) => {
-  const required2 = process.env.MCP_BEARER_TOKEN;
-  if (!required2) return true;
-  const authorization = getHeader(headers, "authorization");
-  if (!authorization?.startsWith("Bearer ")) return false;
-  return secureEqual(authorization.slice(7), required2);
-};
-var requestHeaders = (source) => {
+// nhost-adapter/entry.ts
+var toHeaders = (req) => {
   const headers = new Headers();
-  for (const [name, value] of Object.entries(source ?? {})) {
-    const lower = name.toLowerCase();
-    if (value == null || lower === "host" || lower === "content-length" || lower === "connection" || lower === "transfer-encoding") {
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (value == null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) headers.append(name, item);
       continue;
     }
     headers.set(name, String(value));
@@ -1147,67 +1100,88 @@ var requestHeaders = (source) => {
   }
   return headers;
 };
-var requestBody = (event) => {
-  if (typeof event.body === "string") return event.body;
-  if (event.body != null) return JSON.stringify(event.body);
-  return JSON.stringify(event.data ?? null);
+var requestBody = (req) => {
+  if (typeof req.body === "string") return req.body;
+  if (Buffer.isBuffer(req.body)) return req.body.toString("utf8");
+  return JSON.stringify(req.body ?? null);
 };
-var responseHeaders = (headers) => {
-  const result = {};
+var secureEqual = (left, right) => {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+var authorized = (req) => {
+  const required2 = process.env.MCP_BEARER_TOKEN;
+  if (!required2) return true;
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith("Bearer ")) return false;
+  return secureEqual(authorization.slice(7), required2);
+};
+var setResponseHeaders = (res, headers) => {
   headers.forEach((value, name) => {
     if (name.toLowerCase() !== "content-length" && name.toLowerCase() !== "transfer-encoding") {
-      result[name] = value;
+      res.setHeader(name, value);
     }
   });
-  return result;
 };
-var handle8BaseWebhook = async (rawEvent, _context) => {
+var entry_default = async (req, res) => {
   process.env.REMOTION_MCP_STATELESS = "true";
-  const event = normalizeEvent(rawEvent ?? {});
-  if (!validateBearerToken(event.headers)) {
-    return unauthorized();
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "authorization, content-type, accept, mcp-protocol-version"
+  );
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
   }
-  const transport = new import_webStandardStreamableHttp.WebStandardStreamableHTTPServerTransport({
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32e3,
+        message: "Method not allowed."
+      },
+      id: null
+    });
+  }
+  if (!authorized(req)) {
+    res.setHeader("WWW-Authenticate", "Bearer");
+    return res.status(401).json({
+      error: "Unauthorized"
+    });
+  }
+  const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: void 0,
     enableJsonResponse: true
   });
-  const server = create8BaseMcpServer();
+  const server = createNhostMcpServer();
   try {
     await server.connect(transport);
-    const request = new Request("https://8base.local/mcp", {
+    const request = new globalThis.Request("https://nhost.local/mcp", {
       method: "POST",
-      headers: requestHeaders(event.headers),
-      body: requestBody(event)
+      headers: toHeaders(req),
+      body: requestBody(req)
     });
     const response = await transport.handleRequest(request);
     const body = await response.text();
-    return {
-      statusCode: response.status,
-      headers: responseHeaders(response.headers),
-      body
-    };
+    setResponseHeaders(res, response.headers);
+    return res.status(response.status).send(body);
   } catch (error) {
-    console.error("[remotion-mcp:8base] request failed", error);
-    return {
-      statusCode: 500,
-      headers: {
-        "content-type": "application/json"
+    console.error("[remotion-mcp:nhost] request failed", error);
+    return res.status(500).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32603,
+        message: error instanceof Error ? error.message : "Internal server error"
       },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        error: {
-          code: -32603,
-          message: error instanceof Error ? error.message : "Internal server error"
-        },
-        id: null
-      })
-    };
+      id: null
+    });
   } finally {
     await transport.close().catch(() => void 0);
     await server.close().catch(() => void 0);
   }
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  handle8BaseWebhook
-});
+export {
+  entry_default as default
+};

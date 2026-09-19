@@ -245,6 +245,28 @@ export default function Video({title = "Hello"}) {
 }
 ```
 
+
+## Nhost Function deployment
+
+The repository includes a cloud adapter for Nhost Serverless Functions. Build it with:
+
+```bash
+npm run typecheck:nhost
+npm run build:nhost
+```
+
+This generates `functions/mcp.js`. Nhost installs the cloud-only dependencies from `functions/package.json` and exposes the function at:
+
+```text
+<NHOST_FUNCTIONS_URL>/mcp
+```
+
+The Nhost Function always runs the MCP in stateless mode, using S3 for persistence and Trigger.dev for render-task lifecycle. The user browser still performs the actual Remotion render.
+
+Optional endpoint authentication is available with `MCP_BEARER_TOKEN`.
+
+See `nhost-adapter/README.md` for the deployment layout and required environment variables.
+
 ## Build
 
 ```bash

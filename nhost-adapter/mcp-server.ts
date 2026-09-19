@@ -1,14 +1,14 @@
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import * as z from 'zod';
+import * as z from 'zod/v4';
 import {
   checkGeneratedVideoTask,
   startGeneratedVideoTask,
-} from '../../src/async-render.js';
+} from '../src/async-render.js';
 import {
   createStoredComposition,
   getStoredComposition,
   listStoredCompositions,
-} from '../../src/composition-store.js';
+} from '../src/composition-store.js';
 
 const compositionIdSchema = z
   .string()
@@ -43,24 +43,24 @@ const asError = (error: unknown) => ({
   isError: true,
 });
 
-const unsupportedOn8Base = () =>
+const unsupportedInCloudFunction = () =>
   asError(
     new Error(
-      'This traditional server-side Remotion tool is not supported by the 8base compatibility adapter. Use the persisted composition + browser-render tools instead.',
+      'This traditional server-side Remotion tool is disabled in the Nhost Function deployment. Use persisted compositions and browser rendering instead.',
     ),
   );
 
-export const create8BaseMcpServer = () => {
+export const createNhostMcpServer = () => {
   const server = new McpServer({
     name: 'remotion-mcp',
-    version: '1.5.0-8base',
+    version: '1.5.0-nhost',
   });
 
   server.registerTool(
     'create_composition',
     {
       description:
-        'Persist a reusable React/Remotion composition in S3 for the 8base deployment.',
+        'Persist a reusable React/Remotion composition in S3 for the Nhost Function deployment.',
       inputSchema: {
         compositionId: compositionIdSchema,
         reactCode: z.string().min(1),
@@ -129,7 +129,7 @@ export const create8BaseMcpServer = () => {
     'get_composition',
     {
       description:
-        'Get one persisted composition including React source and default props.',
+        'Get one persisted composition including its React source and default props.',
       inputSchema: {
         compositionId: compositionIdSchema,
       },
@@ -246,20 +246,20 @@ export const create8BaseMcpServer = () => {
     'list_project_compositions',
     {
       description:
-        'Traditional filesystem Remotion project inspection. Not available on 8base Functions.',
+        'Traditional filesystem Remotion project inspection. Disabled in the Nhost Function deployment.',
       inputSchema: {
         entryPoint: z.string().min(1),
         inputProps: inputPropsSchema,
       },
     },
-    async () => unsupportedOn8Base(),
+    async () => unsupportedInCloudFunction(),
   );
 
   server.registerTool(
     'render_video',
     {
       description:
-        'Traditional server-side Remotion rendering. Not available on 8base Functions.',
+        'Traditional server-side Remotion rendering. Disabled in the Nhost Function deployment.',
       inputSchema: {
         entryPoint: z.string().min(1),
         compositionId: z.string().min(1),
@@ -269,14 +269,14 @@ export const create8BaseMcpServer = () => {
         concurrency: z.number().int().positive().optional(),
       },
     },
-    async () => unsupportedOn8Base(),
+    async () => unsupportedInCloudFunction(),
   );
 
   server.registerTool(
     'render_still',
     {
       description:
-        'Traditional server-side still rendering. Not available on 8base Functions.',
+        'Traditional server-side still rendering. Disabled in the Nhost Function deployment.',
       inputSchema: {
         entryPoint: z.string().min(1),
         compositionId: z.string().min(1),
@@ -286,7 +286,7 @@ export const create8BaseMcpServer = () => {
         imageFormat: z.enum(['png', 'jpeg', 'webp']).optional().default('png'),
       },
     },
-    async () => unsupportedOn8Base(),
+    async () => unsupportedInCloudFunction(),
   );
 
   return server;

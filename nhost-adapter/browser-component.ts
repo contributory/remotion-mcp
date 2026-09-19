@@ -1,9 +1,9 @@
 import {dirname} from 'node:path';
 import {createRequire} from 'node:module';
 import {build, type Plugin} from 'esbuild';
-import type {GeneratedVideoRequest} from '../../src/task-types.js';
+import type {GeneratedVideoRequest} from '../src/task-types.js';
 
-const require = createRequire(__filename);
+const require = createRequire(import.meta.url);
 const packageRoot = dirname(require.resolve('remotion/package.json'));
 
 const userComponentPlugin = (reactCode: string): Plugin => ({
