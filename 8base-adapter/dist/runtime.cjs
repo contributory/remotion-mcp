@@ -1,21 +1,55 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
 // adapter-src/runtime.ts
-import { timingSafeEqual } from "node:crypto";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+var runtime_exports = {};
+__export(runtime_exports, {
+  handle8BaseWebhook: () => handle8BaseWebhook
+});
+module.exports = __toCommonJS(runtime_exports);
+var import_node_crypto2 = require("node:crypto");
+var import_webStandardStreamableHttp = require("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
 
 // adapter-src/mcp-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import * as z from "zod/v4";
+var import_mcp = require("@modelcontextprotocol/sdk/server/mcp.js");
+var z = __toESM(require("zod"));
 
 // ../src/async-render.ts
-import { randomBytes, randomUUID } from "node:crypto";
-import { runs, tasks } from "@trigger.dev/sdk";
+var import_node_crypto = require("node:crypto");
+var import_sdk = require("@trigger.dev/sdk");
 
 // adapter-src/browser-component.ts
-import { dirname } from "node:path";
-import { createRequire } from "node:module";
-import { build } from "esbuild";
-var require2 = createRequire(import.meta.url);
-var packageRoot = dirname(require2.resolve("remotion/package.json"));
+var import_node_path = require("node:path");
+var import_node_module = require("node:module");
+var import_esbuild = require("esbuild");
+var require2 = (0, import_node_module.createRequire)(__filename);
+var packageRoot = (0, import_node_path.dirname)(require2.resolve("remotion/package.json"));
 var userComponentPlugin = (reactCode) => ({
   name: "remotion-mcp-user-component",
   setup(buildApi) {
@@ -192,7 +226,7 @@ const run = async () => {
 
 void run();
 `;
-  const result = await build({
+  const result = await (0, import_esbuild.build)({
     stdin: {
       contents: entry,
       sourcefile: "remotion-mcp-browser-runner.tsx",
@@ -245,31 +279,24 @@ void run();
 };
 
 // ../src/local-store.ts
-import {
-  mkdir,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile
-} from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
-var rootDir = () => process.env.REMOTION_MCP_DATA_DIR ?? join(homedir(), ".remotion-mcp");
-var taskDir = (taskId) => join(rootDir(), "tasks", taskId);
-var jobPath = (taskId) => join(taskDir(taskId), "job.json");
-var statusPath = (taskId) => join(taskDir(taskId), "status.json");
-var renderPagePath = (taskId) => join(taskDir(taskId), "render.html");
-var videoPath = (taskId) => join(taskDir(taskId), "video.mp4");
+var import_promises = require("node:fs/promises");
+var import_node_os = require("node:os");
+var import_node_path2 = require("node:path");
+var rootDir = () => process.env.REMOTION_MCP_DATA_DIR ?? (0, import_node_path2.join)((0, import_node_os.homedir)(), ".remotion-mcp");
+var taskDir = (taskId) => (0, import_node_path2.join)(rootDir(), "tasks", taskId);
+var jobPath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "job.json");
+var statusPath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "status.json");
+var renderPagePath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "render.html");
+var videoPath = (taskId) => (0, import_node_path2.join)(taskDir(taskId), "video.mp4");
 var atomicJsonWrite = async (path, value) => {
   const temporary = `${path}.tmp-${process.pid}-${Date.now()}`;
-  await writeFile(temporary, JSON.stringify(value, null, 2), "utf8");
-  await rename(temporary, path);
+  await (0, import_promises.writeFile)(temporary, JSON.stringify(value, null, 2), "utf8");
+  await (0, import_promises.rename)(temporary, path);
 };
 var readLegacyLocalRequest = async (taskId) => {
-  const legacyPath = join(rootDir(), "tasks", `${taskId}.json`);
+  const legacyPath = (0, import_node_path2.join)(rootDir(), "tasks", `${taskId}.json`);
   try {
-    const record2 = JSON.parse(await readFile(legacyPath, "utf8"));
+    const record2 = JSON.parse(await (0, import_promises.readFile)(legacyPath, "utf8"));
     return record2.request ?? null;
   } catch (error) {
     if (error.code === "ENOENT") return null;
@@ -282,7 +309,7 @@ var createLocalJob = async ({
   renderHtml,
   renderToken
 }) => {
-  await mkdir(taskDir(taskId), { recursive: true });
+  await (0, import_promises.mkdir)(taskDir(taskId), { recursive: true });
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   const job = {
     id: taskId,
@@ -298,23 +325,17 @@ var createLocalJob = async ({
       progress: 0,
       updatedAt: createdAt
     }),
-    writeFile(renderPagePath(taskId), renderHtml, "utf8")
+    (0, import_promises.writeFile)(renderPagePath(taskId), renderHtml, "utf8")
   ]);
   return job;
 };
-var readLocalJob = async (taskId) => JSON.parse(await readFile(jobPath(taskId), "utf8"));
-var readLocalState = async (taskId) => JSON.parse(await readFile(statusPath(taskId), "utf8"));
-var localVideoInfo = async (taskId) => stat(videoPath(taskId));
+var readLocalJob = async (taskId) => JSON.parse(await (0, import_promises.readFile)(jobPath(taskId), "utf8"));
+var readLocalState = async (taskId) => JSON.parse(await (0, import_promises.readFile)(statusPath(taskId), "utf8"));
+var localVideoInfo = async (taskId) => (0, import_promises.stat)(videoPath(taskId));
 
 // ../src/s3.ts
-import {
-  GetObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+var import_client_s3 = require("@aws-sdk/client-s3");
+var import_s3_request_presigner = require("@aws-sdk/s3-request-presigner");
 var required = (name) => {
   const value = process.env[name];
   if (!value) {
@@ -338,7 +359,7 @@ var getClient = () => {
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
     };
   }
-  return new S3Client(config);
+  return new import_client_s3.S3Client(config);
 };
 var getS3Bucket = () => required("S3_BUCKET");
 var signedLifetime = () => Math.min(
@@ -351,7 +372,7 @@ var putObject = async ({
   contentType
 }) => {
   await getClient().send(
-    new PutObjectCommand({
+    new import_client_s3.PutObjectCommand({
       Bucket: getS3Bucket(),
       Key: key,
       Body: body,
@@ -362,7 +383,7 @@ var putObject = async ({
 };
 var getTextObject = async (key) => {
   const response = await getClient().send(
-    new GetObjectCommand({
+    new import_client_s3.GetObjectCommand({
       Bucket: getS3Bucket(),
       Key: key
     })
@@ -377,7 +398,7 @@ var listObjectKeys = async (prefix) => {
   let continuationToken;
   do {
     const response = await getClient().send(
-      new ListObjectsV2Command({
+      new import_client_s3.ListObjectsV2Command({
         Bucket: getS3Bucket(),
         Prefix: prefix,
         ContinuationToken: continuationToken
@@ -390,9 +411,9 @@ var listObjectKeys = async (prefix) => {
   } while (continuationToken);
   return keys;
 };
-var getObjectUrl = async (key) => getSignedUrl(
+var getObjectUrl = async (key) => (0, import_s3_request_presigner.getSignedUrl)(
   getClient(),
-  new GetObjectCommand({
+  new import_client_s3.GetObjectCommand({
     Bucket: getS3Bucket(),
     Key: key
   }),
@@ -401,9 +422,9 @@ var getObjectUrl = async (key) => getSignedUrl(
 var createPutUrl = async ({
   key,
   contentType
-}) => getSignedUrl(
+}) => (0, import_s3_request_presigner.getSignedUrl)(
   getClient(),
-  new PutObjectCommand({
+  new import_client_s3.PutObjectCommand({
     Bucket: getS3Bucket(),
     Key: key,
     ContentType: contentType
@@ -411,7 +432,7 @@ var createPutUrl = async ({
   { expiresIn: signedLifetime() }
 );
 var headObject = async (key) => getClient().send(
-  new HeadObjectCommand({
+  new import_client_s3.HeadObjectCommand({
     Bucket: getS3Bucket(),
     Key: key
   })
@@ -482,8 +503,8 @@ var localUrls = ({
   };
 };
 var startLocalTask = async (request) => {
-  const taskId = `render_${randomUUID()}`;
-  const token = randomBytes(32).toString("base64url");
+  const taskId = `render_${(0, import_node_crypto.randomUUID)()}`;
+  const token = (0, import_node_crypto.randomBytes)(32).toString("base64url");
   const urls = localUrls({ taskId, token });
   const renderHtml = await compileBrowserPage({
     taskId,
@@ -511,7 +532,7 @@ var startS3Task = async (request) => {
   if (backend === "trigger" && !process.env.TRIGGER_SECRET_KEY) {
     throw new Error("TRIGGER_SECRET_KEY is required in stateless mode.");
   }
-  const taskId = `render_${randomUUID()}`;
+  const taskId = `render_${(0, import_node_crypto.randomUUID)()}`;
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   const jobRenderKey = renderKey(taskId);
   const jobStatusKey = statusKey(taskId);
@@ -565,7 +586,7 @@ var startS3Task = async (request) => {
     })
   ]);
   if (backend === "trigger") {
-    const handle = await tasks.trigger("remotion-browser-render-job", {
+    const handle = await import_sdk.tasks.trigger("remotion-browser-render-job", {
       taskId,
       statusKey: jobStatusKey,
       outputKey: jobOutputKey
@@ -585,7 +606,7 @@ var startGeneratedVideoTask = async (request) => storageBackend() === "local" ? 
 var migrateLegacyLocalTask = async (taskId) => {
   const request = await readLegacyLocalRequest(taskId);
   if (!request) return null;
-  const token = randomBytes(32).toString("base64url");
+  const token = (0, import_node_crypto.randomBytes)(32).toString("base64url");
   const urls = localUrls({ taskId, token });
   const renderHtml = await compileBrowserPage({
     taskId,
@@ -646,7 +667,7 @@ var checkS3Task = async (taskId) => {
   let triggerStatus;
   let triggerError;
   if (job.triggerRunId) {
-    const run = await runs.retrieve(job.triggerRunId);
+    const run = await import_sdk.runs.retrieve(job.triggerRunId);
     triggerStatus = run.status;
     triggerError = run.error?.message;
   }
@@ -687,18 +708,12 @@ var checkS3Task = async (taskId) => {
 var checkGeneratedVideoTask = async (taskId) => storageBackend() === "local" ? checkLocalTask(taskId) : checkS3Task(taskId);
 
 // ../src/composition-store.ts
-import {
-  mkdir as mkdir2,
-  readFile as readFile2,
-  readdir,
-  rename as rename2,
-  writeFile as writeFile2
-} from "node:fs/promises";
-import { homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
-var localRoot = () => process.env.REMOTION_MCP_DATA_DIR ?? join2(homedir2(), ".remotion-mcp");
-var localCompositionDir = () => join2(localRoot(), "compositions");
-var localCompositionPath = (id) => join2(localCompositionDir(), `${encodeURIComponent(id)}.json`);
+var import_promises2 = require("node:fs/promises");
+var import_node_os2 = require("node:os");
+var import_node_path3 = require("node:path");
+var localRoot = () => process.env.REMOTION_MCP_DATA_DIR ?? (0, import_node_path3.join)((0, import_node_os2.homedir)(), ".remotion-mcp");
+var localCompositionDir = () => (0, import_node_path3.join)(localRoot(), "compositions");
+var localCompositionPath = (id) => (0, import_node_path3.join)(localCompositionDir(), `${encodeURIComponent(id)}.json`);
 var s3Prefix = "remotion-mcp/compositions/";
 var s3CompositionKey = (id) => `${s3Prefix}${encodeURIComponent(id)}.json`;
 var toSummary = (composition) => {
@@ -706,11 +721,11 @@ var toSummary = (composition) => {
   return summary;
 };
 var readLocalComposition = async (id) => JSON.parse(
-  await readFile2(localCompositionPath(id), "utf8")
+  await (0, import_promises2.readFile)(localCompositionPath(id), "utf8")
 );
 var localExists = async (id) => {
   try {
-    await readFile2(localCompositionPath(id), "utf8");
+    await (0, import_promises2.readFile)(localCompositionPath(id), "utf8");
     return true;
   } catch (error) {
     if (error.code === "ENOENT") return false;
@@ -760,15 +775,15 @@ var createStoredComposition = async ({
     updatedAt: now
   };
   if (backend === "local") {
-    await mkdir2(localCompositionDir(), { recursive: true });
+    await (0, import_promises2.mkdir)(localCompositionDir(), { recursive: true });
     const target = localCompositionPath(id);
     const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
-    await writeFile2(
+    await (0, import_promises2.writeFile)(
       temporary,
       JSON.stringify(composition, null, 2),
       "utf8"
     );
-    await rename2(temporary, target);
+    await (0, import_promises2.rename)(temporary, target);
   } else {
     await putObject({
       key: s3CompositionKey(id),
@@ -805,7 +820,7 @@ var getStoredComposition = async (id) => {
 var listStoredCompositions = async () => {
   if (storageBackend() === "local") {
     try {
-      const entries = await readdir(localCompositionDir(), {
+      const entries = await (0, import_promises2.readdir)(localCompositionDir(), {
         withFileTypes: true
       });
       const compositions2 = await Promise.all(
@@ -813,8 +828,8 @@ var listStoredCompositions = async () => {
           (entry) => entry.isFile() && entry.name.endsWith(".json")
         ).map(async (entry) => {
           const parsed = JSON.parse(
-            await readFile2(
-              join2(localCompositionDir(), entry.name),
+            await (0, import_promises2.readFile)(
+              (0, import_node_path3.join)(localCompositionDir(), entry.name),
               "utf8"
             )
           );
@@ -873,7 +888,7 @@ var unsupportedOn8Base = () => asError(
   )
 );
 var create8BaseMcpServer = () => {
-  const server = new McpServer({
+  const server = new import_mcp.McpServer({
     name: "remotion-mcp",
     version: "1.5.0-8base"
   });
@@ -1096,7 +1111,7 @@ var getHeader = (headers, name) => {
 var secureEqual = (left, right) => {
   const a = Buffer.from(left);
   const b = Buffer.from(right);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return a.length === b.length && (0, import_node_crypto2.timingSafeEqual)(a, b);
 };
 var unauthorized = () => ({
   statusCode: 401,
@@ -1152,7 +1167,7 @@ var handle8BaseWebhook = async (rawEvent, _context) => {
   if (!validateBearerToken(event.headers)) {
     return unauthorized();
   }
-  const transport = new WebStandardStreamableHTTPServerTransport({
+  const transport = new import_webStandardStreamableHttp.WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: void 0,
     enableJsonResponse: true
   });
@@ -1192,6 +1207,7 @@ var handle8BaseWebhook = async (rawEvent, _context) => {
     await server.close().catch(() => void 0);
   }
 };
-export {
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
   handle8BaseWebhook
-};
+});

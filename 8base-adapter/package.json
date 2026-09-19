@@ -19,6 +19,9 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "remotion": "^4.0.526",
-    "zod": "^4.6.5"
+    "zod": "^3.25.76"
+  },
+  "overrides": {
+    "@types/dom-webcodecs": "0.1.11"
   }
 }

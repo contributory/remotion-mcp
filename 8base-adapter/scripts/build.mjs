@@ -11,10 +11,10 @@ await mkdir(outdir, {recursive: true});
 
 await build({
   entryPoints: [resolve(root, 'adapter-src/runtime.ts')],
-  outfile: resolve(outdir, 'runtime.mjs'),
+  outfile: resolve(outdir, 'runtime.cjs'),
   bundle: true,
   platform: 'node',
-  format: 'esm',
+  format: 'cjs',
   target: 'node20',
   sourcemap: false,
   minify: false,
@@ -45,4 +45,4 @@ await build({
   ],
 });
 
-console.log('Built 8base adapter:', resolve(outdir, 'runtime.mjs'));
+console.log('Built 8base adapter:', resolve(outdir, 'runtime.cjs'));

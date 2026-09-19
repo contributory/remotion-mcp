@@ -1,9 +1,6 @@
 'use strict';
 
-let runtimePromise;
+const runtime = require('../dist/runtime.cjs');
 
-module.exports = async (event, context) => {
-  runtimePromise ??= import('../dist/runtime.mjs');
-  const runtime = await runtimePromise;
-  return runtime.handle8BaseWebhook(event, context);
-};
+module.exports = async (event, context) =>
+  runtime.handle8BaseWebhook(event, context);
