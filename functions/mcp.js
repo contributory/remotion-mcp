@@ -24122,7 +24122,10 @@ var isTruthy = (value) => value === "1" || value === "true" || value === "yes";
 var isStatelessEnvironment = () => isTruthy(process.env.REMOTION_MCP_STATELESS) || Boolean(
   process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.K_SERVICE || process.env.FUNCTIONS_WORKER_RUNTIME || process.env.NETLIFY || process.env.CF_PAGES
 );
-var executionBackend = () => isStatelessEnvironment() ? "trigger" : "local";
+var executionBackend = () => {
+  if (!isStatelessEnvironment()) return "local";
+  return process.env.TRIGGER_SECRET_KEY ? "trigger" : "browser";
+};
 var storageBackend = () => isStatelessEnvironment() || Boolean(process.env.S3_BUCKET) ? "s3" : "local";
 var httpPort = () => Number(process.env.REMOTION_MCP_HTTP_PORT ?? process.env.PORT ?? 3847);
 var publicBaseUrl = () => {
@@ -24180,9 +24183,6 @@ var startLocalTask = async (request) => {
 };
 var startS3Task = async (request) => {
   const backend = executionBackend();
-  if (backend === "trigger" && !process.env.TRIGGER_SECRET_KEY) {
-    throw new Error("TRIGGER_SECRET_KEY is required in stateless mode.");
-  }
   const taskId = `render_${randomUUID()}`;
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   const jobRenderKey = renderKey(taskId);

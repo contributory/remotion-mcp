@@ -36,18 +36,23 @@ Therefore:
 
 - compositions are stored in S3;
 - render job metadata/status/render pages/videos are stored in S3;
-- Trigger.dev tracks browser-render task lifecycle;
+- Trigger.dev can optionally track browser-render task lifecycle;
 - the user's browser performs the actual Remotion render;
 - MCP transport is stateless Streamable HTTP with JSON responses.
 
 ## Environment
 
-Required for the existing cloud workflow:
+Required for the cloud workflow:
 
 ```text
 S3_BUCKET
-S3_REGION
-TRIGGER_SECRET_KEY
+```
+
+Optional overrides/integrations:
+
+```text
+S3_REGION              # defaults to us-east-1
+TRIGGER_SECRET_KEY     # enables Trigger.dev lifecycle tracking
 ```
 
 For S3-compatible storage, the existing variables are supported:

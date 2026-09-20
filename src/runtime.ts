@@ -12,8 +12,12 @@ export const isStatelessEnvironment = (): boolean =>
       process.env.CF_PAGES,
   );
 
-export const executionBackend = (): 'local' | 'trigger' =>
-  isStatelessEnvironment() ? 'trigger' : 'local';
+export type ExecutionBackend = 'local' | 'browser' | 'trigger';
+
+export const executionBackend = (): ExecutionBackend => {
+  if (!isStatelessEnvironment()) return 'local';
+  return process.env.TRIGGER_SECRET_KEY ? 'trigger' : 'browser';
+};
 
 export const storageBackend = (): 'local' | 's3' =>
   isStatelessEnvironment() || Boolean(process.env.S3_BUCKET) ? 's3' : 'local';

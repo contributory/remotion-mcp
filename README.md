@@ -9,7 +9,7 @@ MCP server for Remotion with browser-side video generation from AI-authored Reac
 ```json
 {
   "taskId": "render_...",
-  "backend": "local or trigger",
+  "backend": "local, browser, or trigger",
   "storage": "local or s3",
   "renderUrl": "...",
   "status": "waiting_for_browser"
@@ -139,20 +139,29 @@ In stateless mode:
 - S3 storage is mandatory;
 - render page, task state, compositions, and MP4 are stored in S3;
 - the user's browser uploads directly to S3 using presigned URLs;
-- Trigger.dev tracks the browser-render job;
-- Trigger.dev does not run Chrome, Puppeteer, FFmpeg, or Remotion rendering.
+- Trigger.dev can optionally track the browser-render job;
+- when configured, Trigger.dev does not run Chrome, Puppeteer, FFmpeg, or Remotion rendering.
 
 Required configuration:
 
 ```bash
 REMOTION_MCP_STATELESS=true
-
 S3_BUCKET=my-video-bucket
-S3_REGION=us-east-1
-
-TRIGGER_SECRET_KEY=tr_...
-TRIGGER_PROJECT_REF=proj_...
 ```
+
+Optional S3 region override (defaults to `us-east-1`):
+
+```bash
+S3_REGION=eu-west-1
+```
+
+Optional Trigger.dev lifecycle tracking:
+
+```bash
+TRIGGER_SECRET_KEY=tr_...
+```
+
+`TRIGGER_PROJECT_REF` is only needed by the Trigger.dev CLI/config when deploying the tracker; the MCP runtime does not require it.
 
 S3-compatible services can additionally use:
 
@@ -178,8 +187,9 @@ Setting `S3_BUCKET` on a stateful MCP automatically switches **all persistent st
 
 ```bash
 S3_BUCKET=my-video-bucket
-S3_REGION=us-east-1
 ```
+
+`S3_REGION` remains optional here and defaults to `us-east-1`.
 
 In this mode task responses use:
 
@@ -192,7 +202,7 @@ In this mode task responses use:
 
 Trigger.dev is not used. Stateful transport can still be stdio or HTTP.
 
-Deploy the Trigger.dev tracker with:
+If you want Trigger.dev lifecycle tracking, deploy the optional tracker with:
 
 ```bash
 npm run trigger:deploy

@@ -32,7 +32,7 @@ export type LocalBrowserRenderJob = {
 
 export type BrowserRenderJob = {
   id: string;
-  backend: 'local' | 'trigger';
+  backend: 'local' | 'browser' | 'trigger';
   createdAt: string;
   compositionId: string;
   durationInFrames: number;

@@ -2,14 +2,6 @@
 
 
 [[global.environment]]
-name = 'TRIGGER_SECRET_KEY'
-value = '{{ secrets.TRIGGER_SECRET_KEY }}'
-
-[[global.environment]]
-name = 'TRIGGER_PROJECT_REF'
-value = '{{ secrets.TRIGGER_PROJECT_REF }}'
-
-[[global.environment]]
 name = 'S3_ENDPOINT'
 value = '{{ secrets.S3_ENDPOINT }}'
 

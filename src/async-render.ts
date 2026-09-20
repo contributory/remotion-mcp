@@ -100,10 +100,6 @@ const startLocalTask = async (request: GeneratedVideoRequest) => {
 const startS3Task = async (request: GeneratedVideoRequest) => {
   const backend = executionBackend();
 
-  if (backend === 'trigger' && !process.env.TRIGGER_SECRET_KEY) {
-    throw new Error('TRIGGER_SECRET_KEY is required in stateless mode.');
-  }
-
   const taskId = `render_${randomUUID()}`;
   const createdAt = new Date().toISOString();
   const jobRenderKey = renderKey(taskId);
