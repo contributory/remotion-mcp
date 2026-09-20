@@ -1,32 +1,18 @@
-import {dirname} from 'node:path';
-import {createRequire} from 'node:module';
-import {build, type Plugin} from 'esbuild';
+import {transform} from 'sucrase';
 import type {GeneratedVideoRequest} from '../src/task-types.js';
 
-const require = createRequire(import.meta.url);
-const packageRoot = dirname(require.resolve('remotion/package.json'));
-
-const userComponentPlugin = (reactCode: string): Plugin => ({
-  name: 'remotion-mcp-user-component',
-  setup(buildApi) {
-    buildApi.onResolve({filter: /^remotion-mcp:user-component$/}, () => ({
-      path: 'user-component',
-      namespace: 'remotion-mcp',
-    }));
-
-    buildApi.onLoad(
-      {filter: /.*/, namespace: 'remotion-mcp'},
-      () => ({
-        contents: reactCode,
-        loader: 'tsx',
-        resolveDir: packageRoot,
-      }),
-    );
-  },
-});
+declare const __REMOTION_MCP_BROWSER_RUNTIME__: string;
 
 const escapeScript = (javascript: string): string =>
   javascript.replace(/<\/script/gi, '<\\/script');
+
+const compileUserComponent = (reactCode: string): string =>
+  transform(reactCode, {
+    transforms: ['typescript', 'jsx', 'imports'],
+    filePath: 'remotion-mcp-user-component.tsx',
+    jsxRuntime: 'classic',
+    production: true,
+  }).code;
 
 export const compileBrowserPage = async ({
   taskId,
@@ -41,10 +27,34 @@ export const compileBrowserPage = async ({
   statusUploadUrl: string;
   videoViewUrl: string;
 }): Promise<string> => {
-  const entry = `
-import {renderMediaOnWeb} from '@remotion/web-renderer';
-import Component from 'remotion-mcp:user-component';
+  const userJavascript = compileUserComponent(request.reactCode);
 
+  const javascript = `
+${__REMOTION_MCP_BROWSER_RUNTIME__}
+
+const runtime = globalThis.__REMOTION_MCP_RUNTIME__;
+if (!runtime) {
+  throw new Error('Remotion browser runtime failed to initialize.');
+}
+
+const requireModule = (specifier) => {
+  if (specifier === 'react') return runtime.React;
+  if (specifier === 'remotion') return runtime.Remotion;
+  if (specifier === '@remotion/web-renderer') return runtime.WebRenderer;
+  throw new Error('Unsupported browser-render import: ' + specifier);
+};
+
+const userModule = {exports: {}};
+((module, exports, require) => {
+${userJavascript}
+})(userModule, userModule.exports, requireModule);
+
+const Component = userModule.exports.default ?? userModule.exports;
+if (!Component) {
+  throw new Error('React source must default-export a component.');
+}
+
+const {renderMediaOnWeb} = runtime.WebRenderer;
 const taskId = ${JSON.stringify(taskId)};
 const config = ${JSON.stringify({
     compositionId: request.compositionId,
@@ -193,32 +203,6 @@ const run = async () => {
 void run();
 `;
 
-  const result = await build({
-    stdin: {
-      contents: entry,
-      sourcefile: 'remotion-mcp-browser-runner.tsx',
-      loader: 'tsx',
-      resolveDir: packageRoot,
-    },
-    plugins: [userComponentPlugin(request.reactCode)],
-    bundle: true,
-    write: false,
-    format: 'esm',
-    platform: 'browser',
-    target: ['es2022'],
-    sourcemap: false,
-    minify: true,
-    logLevel: 'silent',
-    define: {
-      'process.env.NODE_ENV': '"production"',
-    },
-  });
-
-  const javascript = result.outputFiles[0]?.text;
-  if (!javascript) {
-    throw new Error('Failed to compile browser render page.');
-  }
-
   return `<!doctype html>
 <html>
 <head>
@@ -242,7 +226,7 @@ void run();
   <div class="bar"><div class="fill" id="fill"></div></div>
   <p id="progress">0%</p>
   <pre id="error" hidden></pre>
-  <script type="module">${escapeScript(javascript)}</script>
+  <script>${escapeScript(javascript)}</script>
 </body>
 </html>`;
 };

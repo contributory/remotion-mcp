@@ -1,6 +1,5 @@
 import {randomBytes, randomUUID} from 'node:crypto';
 import {runs, tasks} from '@trigger.dev/sdk';
-import {compileBrowserPage} from './browser-component.js';
 import {
   createLocalJob,
   localVideoInfo,
@@ -34,6 +33,17 @@ import type {
   BrowserRenderJob,
   GeneratedVideoRequest,
 } from './task-types.js';
+
+const compileBrowserPage = async (args: {
+  taskId: string;
+  request: GeneratedVideoRequest;
+  videoUploadUrl: string;
+  statusUploadUrl: string;
+  videoViewUrl: string;
+}): Promise<string> => {
+  const module = await import('./browser-component.js');
+  return module.compileBrowserPage(args);
+};
 
 const localUrls = ({
   taskId,
