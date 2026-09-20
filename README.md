@@ -2,6 +2,8 @@
 
 MCP server for Remotion with browser-side video generation from AI-authored React code.
 
+Public repository: https://github.com/contributory/remotion-mcp
+
 ## Async browser-render flow
 
 `create_video_from_react` always returns:
@@ -216,6 +218,7 @@ remotion-browser-render-job
 
 ## MCP tools
 
+- `about` — return authoritative metadata about remotion-mcp, including the public repository, capabilities, runtime/deployment model, and browser-render workflow guidance.
 - `create_composition` — create or explicitly overwrite a reusable persisted composition.
 - `list_compositions` — list persisted composition metadata.
 - `get_composition` — get one persisted composition including React source.

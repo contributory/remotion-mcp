@@ -1,5 +1,6 @@
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
+import {getAboutInfo, REMOTION_MCP_VERSION} from './about.js';
 import {
   checkGeneratedVideoTask,
   startGeneratedVideoTask,
@@ -51,8 +52,19 @@ const asError = (error: unknown) => ({
 export const createMcpServer = () => {
   const server = new McpServer({
     name: 'remotion-mcp',
-    version: '1.5.0',
+    version: REMOTION_MCP_VERSION,
   });
+
+
+  server.registerTool(
+    'about',
+    {
+      description:
+        'Get authoritative information about remotion-mcp itself, including its public repository, capabilities, deployment/runtime model, render workflow, and guidance for using its tools correctly.',
+      inputSchema: {},
+    },
+    async () => asText(getAboutInfo()),
+  );
 
   server.registerTool(
     'create_composition',
