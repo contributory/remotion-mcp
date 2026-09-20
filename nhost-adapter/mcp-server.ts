@@ -1,6 +1,7 @@
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import {getAboutInfo, REMOTION_MCP_VERSION} from '../src/about.js';
+import {listGeneratedVideos} from '../src/video-list.js';
 import {
   checkGeneratedVideoTask,
   startGeneratedVideoTask,
@@ -66,6 +67,37 @@ export const createNhostMcpServer = () => {
       inputSchema: {},
     },
     async () => asText(getAboutInfo()),
+  );
+
+
+  server.registerTool(
+    'list_videos',
+    {
+      description:
+        'List completed videos created by remotion-mcp. Results are paginated; use nextCursor as cursor in the next call to continue listing all videos.',
+      inputSchema: {
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .default(20)
+          .describe('Maximum number of videos to return in one call (1-50)'),
+        cursor: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Opaque cursor returned by the previous list_videos call'),
+      },
+    },
+    async ({limit, cursor}) => {
+      try {
+        return asText(await listGeneratedVideos({limit, cursor}));
+      } catch (error) {
+        return asError(error);
+      }
+    },
   );
 
   server.registerTool(

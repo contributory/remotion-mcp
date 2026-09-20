@@ -1,5 +1,6 @@
 import {
   mkdir,
+  readdir,
   readFile,
   rename,
   rm,
@@ -137,3 +138,77 @@ export const saveLocalVideo = async (
 
 export const localVideoInfo = async (taskId: string) =>
   stat(videoPath(taskId));
+
+
+export const listLocalCompletedVideosPage = async ({
+  limit,
+  cursor,
+}: {
+  limit: number;
+  cursor?: string;
+}): Promise<{
+  items: Array<{
+    taskId: string;
+    sizeInBytes: number;
+    lastModified?: string;
+    renderToken: string;
+  }>;
+  nextCursor?: string;
+}> => {
+  const tasksRoot = join(rootDir(), 'tasks');
+  let entries;
+
+  try {
+    entries = await readdir(tasksRoot, {withFileTypes: true});
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {items: []};
+    }
+    throw error;
+  }
+
+  const completed = [] as Array<{
+    taskId: string;
+    sizeInBytes: number;
+    lastModified?: string;
+    renderToken: string;
+    sortTime: number;
+  }>;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const taskId = entry.name;
+
+    try {
+      const [info, job] = await Promise.all([
+        stat(videoPath(taskId)),
+        readLocalJob(taskId),
+      ]);
+      completed.push({
+        taskId,
+        sizeInBytes: info.size,
+        lastModified: info.mtime.toISOString(),
+        renderToken: job.renderToken,
+        sortTime: info.mtimeMs,
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+  }
+
+  completed.sort((a, b) => b.sortTime - a.sortTime || a.taskId.localeCompare(b.taskId));
+
+  const offset = cursor ? Number.parseInt(cursor, 10) : 0;
+  if (!Number.isSafeInteger(offset) || offset < 0) {
+    throw new Error('Invalid local video cursor.');
+  }
+
+  const page = completed.slice(offset, offset + limit);
+  const nextOffset = offset + page.length;
+
+  return {
+    items: page.map(({sortTime: _sortTime, ...item}) => item),
+    nextCursor: nextOffset < completed.length ? String(nextOffset) : undefined,
+  };
+};

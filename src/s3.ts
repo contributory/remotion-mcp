@@ -82,6 +82,45 @@ export const getTextObject = async (key: string): Promise<string> => {
   return response.Body.transformToString();
 };
 
+
+export type ListedObject = {
+  key: string;
+  sizeInBytes: number;
+  lastModified?: string;
+};
+
+export const listObjectPage = async ({
+  prefix,
+  limit,
+  cursor,
+}: {
+  prefix: string;
+  limit: number;
+  cursor?: string;
+}): Promise<{items: ListedObject[]; nextCursor?: string}> => {
+  const response = await getClient().send(
+    new ListObjectsV2Command({
+      Bucket: getS3Bucket(),
+      Prefix: prefix,
+      MaxKeys: limit,
+      ContinuationToken: cursor,
+    }),
+  );
+
+  return {
+    items: (response.Contents ?? [])
+      .filter((object) => Boolean(object.Key))
+      .map((object) => ({
+        key: object.Key!,
+        sizeInBytes: object.Size ?? 0,
+        lastModified: object.LastModified?.toISOString(),
+      })),
+    nextCursor: response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined,
+  };
+};
+
 export const listObjectKeys = async (prefix: string): Promise<string[]> => {
   const keys: string[] = [];
   let continuationToken: string | undefined;

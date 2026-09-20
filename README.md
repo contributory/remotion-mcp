@@ -219,6 +219,7 @@ remotion-browser-render-job
 ## MCP tools
 
 - `about` — return authoritative metadata about remotion-mcp, including the public repository, capabilities, runtime/deployment model, and browser-render workflow guidance.
+- `list_videos` — list completed generated MP4 videos with a configurable `limit` (1–50) and `nextCursor` pagination.
 - `create_composition` — create or explicitly overwrite a reusable persisted composition.
 - `list_compositions` — list persisted composition metadata.
 - `get_composition` — get one persisted composition including React source.

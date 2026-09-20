@@ -23929,6 +23929,7 @@ var getAboutInfo = () => {
       "Create one-off browser-rendered videos from React/TSX",
       "Render persisted compositions with per-render input props",
       "Track browser render tasks and return final MP4 URLs",
+      "List completed generated videos with cursor-based pagination and configurable page size",
       "Persist compositions, render pages, task state, and videos in S3-compatible storage",
       "Use local stateful storage when S3 is not configured",
       "Optionally track stateless browser renders with Trigger.dev",
@@ -23945,6 +23946,7 @@ var getAboutInfo = () => {
     },
     tools: [
       "about",
+      "list_videos",
       "create_composition",
       "list_compositions",
       "get_composition",
@@ -23958,13 +23960,10 @@ var getAboutInfo = () => {
   };
 };
 
-// src/async-render.ts
-import { randomBytes, randomUUID } from "node:crypto";
-import { runs, tasks } from "@trigger.dev/sdk";
-
 // src/local-store.ts
 import {
   mkdir,
+  readdir,
   readFile,
   rename,
   rm,
@@ -24023,6 +24022,70 @@ var createLocalJob = async ({
 var readLocalJob = async (taskId) => JSON.parse(await readFile(jobPath(taskId), "utf8"));
 var readLocalState = async (taskId) => JSON.parse(await readFile(statusPath(taskId), "utf8"));
 var localVideoInfo = async (taskId) => stat(videoPath(taskId));
+var listLocalCompletedVideosPage = async ({
+  limit,
+  cursor
+}) => {
+  const tasksRoot = join(rootDir(), "tasks");
+  let entries;
+  try {
+    entries = await readdir(tasksRoot, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return { items: [] };
+    }
+    throw error;
+  }
+  const completed = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const taskId = entry.name;
+    try {
+      const [info, job] = await Promise.all([
+        stat(videoPath(taskId)),
+        readLocalJob(taskId)
+      ]);
+      completed.push({
+        taskId,
+        sizeInBytes: info.size,
+        lastModified: info.mtime.toISOString(),
+        renderToken: job.renderToken,
+        sortTime: info.mtimeMs
+      });
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+  }
+  completed.sort((a, b) => b.sortTime - a.sortTime || a.taskId.localeCompare(b.taskId));
+  const offset = cursor ? Number.parseInt(cursor, 10) : 0;
+  if (!Number.isSafeInteger(offset) || offset < 0) {
+    throw new Error("Invalid local video cursor.");
+  }
+  const page = completed.slice(offset, offset + limit);
+  const nextOffset = offset + page.length;
+  return {
+    items: page.map(({ sortTime: _sortTime, ...item }) => item),
+    nextCursor: nextOffset < completed.length ? String(nextOffset) : void 0
+  };
+};
+
+// src/runtime.ts
+var isTruthy = (value) => value === "1" || value === "true" || value === "yes";
+var isStatelessEnvironment = () => isTruthy(process.env.REMOTION_MCP_STATELESS) || Boolean(
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.K_SERVICE || process.env.FUNCTIONS_WORKER_RUNTIME || process.env.NETLIFY || process.env.CF_PAGES
+);
+var executionBackend = () => {
+  if (!isStatelessEnvironment()) return "local";
+  return process.env.TRIGGER_SECRET_KEY ? "trigger" : "browser";
+};
+var storageBackend = () => isStatelessEnvironment() || Boolean(process.env.S3_BUCKET) ? "s3" : "local";
+var httpPort = () => Number(process.env.REMOTION_MCP_HTTP_PORT ?? process.env.PORT ?? 3847);
+var publicBaseUrl = () => {
+  const explicit = process.env.REMOTION_MCP_PUBLIC_BASE_URL?.replace(/\/$/, "");
+  if (explicit) return explicit;
+  return `http://127.0.0.1:${httpPort()}`;
+};
 
 // src/s3.ts
 import {
@@ -24090,6 +24153,28 @@ var getTextObject = async (key) => {
   }
   return response.Body.transformToString();
 };
+var listObjectPage = async ({
+  prefix,
+  limit,
+  cursor
+}) => {
+  const response = await getClient().send(
+    new ListObjectsV2Command({
+      Bucket: getS3Bucket(),
+      Prefix: prefix,
+      MaxKeys: limit,
+      ContinuationToken: cursor
+    })
+  );
+  return {
+    items: (response.Contents ?? []).filter((object) => Boolean(object.Key)).map((object) => ({
+      key: object.Key,
+      sizeInBytes: object.Size ?? 0,
+      lastModified: object.LastModified?.toISOString()
+    })),
+    nextCursor: response.IsTruncated ? response.NextContinuationToken : void 0
+  };
+};
 var listObjectKeys = async (prefix) => {
   const keys = [];
   let continuationToken;
@@ -24145,6 +24230,62 @@ var getVideoUrl = async ({
   return getObjectUrl(key);
 };
 
+// src/video-list.ts
+var VIDEO_PREFIX = "remotion-mcp/videos/";
+var VIDEO_SUFFIX = ".mp4";
+var localVideoUrl = ({
+  taskId,
+  token
+}) => {
+  const encodedTaskId = encodeURIComponent(taskId);
+  const encodedToken = encodeURIComponent(token);
+  return `${publicBaseUrl()}/video/${encodedTaskId}.mp4?token=${encodedToken}`;
+};
+var listGeneratedVideos = async ({
+  limit,
+  cursor
+}) => {
+  if (storageBackend() === "local") {
+    const page2 = await listLocalCompletedVideosPage({ limit, cursor });
+    return {
+      storage: "local",
+      items: page2.items.map((item) => ({
+        taskId: item.taskId,
+        sizeInBytes: item.sizeInBytes,
+        lastModified: item.lastModified,
+        videoUrl: localVideoUrl({
+          taskId: item.taskId,
+          token: item.renderToken
+        })
+      })),
+      nextCursor: page2.nextCursor ?? null
+    };
+  }
+  const page = await listObjectPage({
+    prefix: VIDEO_PREFIX,
+    limit,
+    cursor
+  });
+  const bucket = getS3Bucket();
+  const items = await Promise.all(
+    page.items.filter((item) => item.key.endsWith(VIDEO_SUFFIX)).map(async (item) => ({
+      taskId: item.key.slice(VIDEO_PREFIX.length, -VIDEO_SUFFIX.length),
+      sizeInBytes: item.sizeInBytes,
+      lastModified: item.lastModified,
+      videoUrl: await getVideoUrl({ bucket, key: item.key })
+    }))
+  );
+  return {
+    storage: "s3",
+    items,
+    nextCursor: page.nextCursor ?? null
+  };
+};
+
+// src/async-render.ts
+import { randomBytes, randomUUID } from "node:crypto";
+import { runs, tasks } from "@trigger.dev/sdk";
+
 // src/job-store.ts
 var jobKey = (taskId) => `remotion-mcp/jobs/${taskId}/job.json`;
 var renderKey = (taskId) => `remotion-mcp/jobs/${taskId}/render.html`;
@@ -24166,23 +24307,6 @@ var saveState = async (key, state) => {
   });
 };
 var readState = async (key) => JSON.parse(await getTextObject(key));
-
-// src/runtime.ts
-var isTruthy = (value) => value === "1" || value === "true" || value === "yes";
-var isStatelessEnvironment = () => isTruthy(process.env.REMOTION_MCP_STATELESS) || Boolean(
-  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.K_SERVICE || process.env.FUNCTIONS_WORKER_RUNTIME || process.env.NETLIFY || process.env.CF_PAGES
-);
-var executionBackend = () => {
-  if (!isStatelessEnvironment()) return "local";
-  return process.env.TRIGGER_SECRET_KEY ? "trigger" : "browser";
-};
-var storageBackend = () => isStatelessEnvironment() || Boolean(process.env.S3_BUCKET) ? "s3" : "local";
-var httpPort = () => Number(process.env.REMOTION_MCP_HTTP_PORT ?? process.env.PORT ?? 3847);
-var publicBaseUrl = () => {
-  const explicit = process.env.REMOTION_MCP_PUBLIC_BASE_URL?.replace(/\/$/, "");
-  if (explicit) return explicit;
-  return `http://127.0.0.1:${httpPort()}`;
-};
 
 // src/async-render.ts
 var compileBrowserPage2 = async (args) => {
@@ -24412,7 +24536,7 @@ var checkGeneratedVideoTask = async (taskId) => storageBackend() === "local" ? c
 import {
   mkdir as mkdir2,
   readFile as readFile2,
-  readdir,
+  readdir as readdir2,
   rename as rename2,
   writeFile as writeFile2
 } from "node:fs/promises";
@@ -24527,7 +24651,7 @@ var getStoredComposition = async (id) => {
 var listStoredCompositions = async () => {
   if (storageBackend() === "local") {
     try {
-      const entries = await readdir(localCompositionDir(), {
+      const entries = await readdir2(localCompositionDir(), {
         withFileTypes: true
       });
       const compositions2 = await Promise.all(
@@ -24606,6 +24730,23 @@ var createNhostMcpServer = () => {
       inputSchema: {}
     },
     async () => asText(getAboutInfo())
+  );
+  server.registerTool(
+    "list_videos",
+    {
+      description: "List completed videos created by remotion-mcp. Results are paginated; use nextCursor as cursor in the next call to continue listing all videos.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional().default(20).describe("Maximum number of videos to return in one call (1-50)"),
+        cursor: z.string().min(1).optional().describe("Opaque cursor returned by the previous list_videos call")
+      }
+    },
+    async ({ limit, cursor }) => {
+      try {
+        return asText(await listGeneratedVideos({ limit, cursor }));
+      } catch (error) {
+        return asError(error);
+      }
+    }
   );
   server.registerTool(
     "create_composition",

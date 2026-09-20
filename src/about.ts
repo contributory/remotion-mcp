@@ -23,6 +23,7 @@ export const getAboutInfo = () => {
       'Create one-off browser-rendered videos from React/TSX',
       'Render persisted compositions with per-render input props',
       'Track browser render tasks and return final MP4 URLs',
+      'List completed generated videos with cursor-based pagination and configurable page size',
       'Persist compositions, render pages, task state, and videos in S3-compatible storage',
       'Use local stateful storage when S3 is not configured',
       'Optionally track stateless browser renders with Trigger.dev',
@@ -44,6 +45,7 @@ export const getAboutInfo = () => {
     },
     tools: [
       'about',
+      'list_videos',
       'create_composition',
       'list_compositions',
       'get_composition',
